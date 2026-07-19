@@ -1,0 +1,61 @@
+# Continuous Integration: runs automatically on every push and pull request.
+# It checks that both halves of the project still build/typecheck cleanly.
+#
+# Two independent jobs run in parallel:
+#   backend  — installs Python deps and verifies the FastAPI app imports.
+#   mobile   — installs Node deps and type-checks the Expo app.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend (Python)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Byte-compile all source
+        run: python -m compileall app
+
+      - name: Verify the app imports cleanly
+        run: python -c "import app.main; print('app imports OK')"
+
+  mobile:
+    name: Mobile (TypeScript)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npx tsc --noEmit
