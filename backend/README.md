@@ -29,6 +29,26 @@ uvicorn app.main:app --reload
 The app boots without Supabase credentials. Auth endpoints return `503`
 until `SUPABASE_URL` / `SUPABASE_ANON_KEY` are set in `.env`.
 
+## Environments (dev / staging / prod)
+
+`APP_ENV` selects which env file the app loads at startup:
+
+| `APP_ENV` | File loaded      | Template                |
+|-----------|------------------|-------------------------|
+| `dev`     | `.env` (default) | `.env.example`          |
+| `staging` | `.env.staging`   | `.env.staging.example`  |
+| `prod`    | `.env.prod`      | `.env.prod.example`     |
+
+```bash
+# Windows (PowerShell)
+$env:APP_ENV = "staging"; uvicorn app.main:app
+# macOS/Linux
+APP_ENV=prod uvicorn app.main:app
+```
+
+Startup fails loudly if `APP_ENV` is unknown, or if `CORS_ORIGINS` is `*`
+outside dev. `GET /health` echoes the active `environment`.
+
 ## Endpoints (v1)
 
 | Method | Path             | Auth        | Purpose                       |

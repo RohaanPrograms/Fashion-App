@@ -26,6 +26,20 @@ The app talks to the FastAPI backend, so start that too (`uvicorn app.main:app
 `EXPO_PUBLIC_API_URL` to your computer's LAN IP — `localhost` on the phone means
 the phone itself, not your computer.
 
+## Environments (dev / staging / prod)
+
+`EXPO_PUBLIC_ENV` selects which backend URL the app points at (see
+`src/config.ts`):
+
+| `EXPO_PUBLIC_ENV` | Backend URL                     |
+|-------------------|---------------------------------|
+| `dev` (default)   | `http://localhost:8000`         |
+| `staging`         | your deployed staging API       |
+| `prod`            | your deployed production API     |
+
+`EXPO_PUBLIC_API_URL`, if set, always overrides the per-environment default —
+use it for the LAN-IP case above.
+
 ## Structure
 
 ```
