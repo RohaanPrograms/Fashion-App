@@ -122,9 +122,9 @@ More detail in [`backend/README.md`](./backend/README.md).
 
 - [x] Repo structure and environment config
 - [x] FastAPI skeleton with `/auth` endpoints
-- [ ] React Native + Expo app: signup, login, navigation
-- [ ] Supabase project: auth, schema, storage bucket
-- [ ] GitHub Actions CI pipeline
+- [x] React Native + Expo app: signup, login, navigation
+- [x] Supabase project: auth, schema, storage bucket
+- [x] GitHub Actions CI pipeline
 
 | Phase | | Highlights |
 |---|---|---|
