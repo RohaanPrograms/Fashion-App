@@ -559,61 +559,67 @@ If users return to the feed daily and tap affiliate links, the idea works.
 
 ## Build Phases
 
+> **Effort scale used below:**
+> 🟢 **Low** — Straightforward, mostly following docs/tutorials, AI handles it well, few hours.
+> 🟡 **Medium** — Some real thinking required, a few moving parts to connect, could take a day or more.
+> 🟠 **High** — Genuinely tricky, multiple systems interacting, expect debugging sessions, could take several days.
+> 🔴 **Very High** — Hard even for experienced developers, often has no clean AI-generated answer, research-heavy.
+
 ### Phase 0 — Foundation (Weeks 1–2)
-- [x] Supabase project: auth, database schema, storage bucket
-- [x] FastAPI skeleton with /auth endpoints
-- [ ] React Native + Expo app: sign up, login, basic navigation
-- [ ] GitHub repo + GitHub Actions CI pipeline
-- [ ] Environment config (dev / staging / prod)
+- [x] Supabase project: auth, database schema, storage bucket — 🟢 Low
+- [x] FastAPI skeleton with /auth endpoints — 🟢 Low
+- [x] React Native + Expo app: sign up, login, basic navigation — 🟡 Medium *(first time setting up navigation + auth screens takes longer than it looks)*
+- [x] GitHub repo + GitHub Actions CI pipeline — 🟢 Low *(mostly copy-paste from templates)*
+- [x] Environment config (dev / staging / prod) — 🟢 Low
 
 ### Phase 1 — Discovery Feed + Onboarding (Weeks 3–5)
-- [ ] Ingest first 500 products from ASOS affiliate feed
-- [ ] Run CLIP embeddings on products → store in Pinecone
-- [ ] Onboarding quiz screens (gender, budget, aesthetic tiles)
-- [ ] Store quiz results on user profile (gender, budget, cluster seeds)
-- [ ] GET /v1/feed endpoint (uses cluster seeds from quiz initially, then interaction history)
-- [ ] Swipe card UI in React Native (gesture handler + reanimated)
-- [ ] Like / dislike / wishlist / cart interactions
-- [ ] Dwell time tracking
-- [ ] POST /v1/interactions endpoint (batched writes via Redis)
-- [ ] Affiliate link tap-through (opens browser)
+- [ ] Ingest first 500 products from ASOS affiliate feed — 🟡 Medium *(depends entirely on how clean ASOS's feed format is — could be easy or annoying)*
+- [ ] Run CLIP embeddings on products → store in Pinecone — 🟡 Medium *(straightforward once one product works end-to-end, but first setup has several moving pieces: Replicate call → Pinecone upsert)*
+- [ ] Onboarding quiz screens (gender, budget, aesthetic tiles) — 🟢 Low *(pure UI, no backend complexity)*
+- [ ] Store quiz results on user profile (gender, budget, cluster seeds) — 🟢 Low
+- [ ] GET /v1/feed endpoint (cluster seeds initially, then interaction history) — 🟡 Medium *(logic is simple at MVP — just filtering by cluster — gets harder later)*
+- [ ] Swipe card UI in React Native (gesture handler + reanimated) — 🟠 High *(this is the hardest UI piece in the whole app — gesture-driven animation has a real learning curve, especially first time)*
+- [ ] Like / dislike / wishlist / cart interactions — 🟢 Low *(simple CRUD once the swipe UI exists)*
+- [ ] Dwell time tracking — 🟡 Medium *(timer logic is easy; getting it accurate across app backgrounding/foregrounding is fiddly)*
+- [ ] POST /v1/interactions endpoint (batched writes via Redis) — 🟡 Medium *(the batching/queue logic is the tricky part, not the endpoint itself)*
+- [ ] Affiliate link tap-through (opens browser) — 🟢 Low
 
 ### Phase 2 — Visual Search (Weeks 6–8)
-- [ ] Image upload → Supabase Storage
-- [ ] POST /v1/search/image endpoint
-- [ ] CLIP embedding via Replicate
-- [ ] Pinecone similarity search
-- [ ] Budget filter
-- [ ] Results screen with affiliate links
-- [ ] Add Farfetch catalog (second source)
+- [ ] Image upload → Supabase Storage — 🟢 Low
+- [ ] POST /v1/search/image endpoint — 🟡 Medium
+- [ ] CLIP embedding via Replicate — 🟢 Low *(you'll have already built this pattern in Phase 1)*
+- [ ] Pinecone similarity search — 🟢 Low *(reusing the same setup as Phase 1)*
+- [ ] Budget filter — 🟢 Low
+- [ ] Results screen with affiliate links — 🟢 Low
+- [ ] Add Farfetch catalog (second source) — 🟡 Medium *(every new source means learning a new API's quirks)*
 
 ### Phase 3 — Personalisation (Weeks 9–12)
-- [ ] Style vector construction from interaction history
-- [ ] Personalised feed using cosine similarity (user vector ↔ product vectors)
-- [ ] Feed visibly improves with more interactions
-- [ ] "Because you liked X" labels on feed items
-- [ ] Daily sync pipeline for catalog freshness
+- [ ] Style vector construction from interaction history — 🟠 High *(first genuinely "ML systems" task — deciding how to weight/average embeddings correctly matters)*
+- [ ] Personalised feed using cosine similarity (user vector ↔ product vectors) — 🟡 Medium *(math is simple, but tuning it to feel "right" takes iteration)*
+- [ ] Feed visibly improves with more interactions — 🟠 High *(this is a "does it actually work" validation task, not a coding task — hard to know when it's good enough)*
+- [ ] "Because you liked X" labels on feed items — 🟢 Low
+- [ ] Daily sync pipeline for catalog freshness — 🟡 Medium *(cron jobs + failure handling, error retries)*
 
 ### Phase 4 — Scale Intelligence (Post-MVP)
-- [ ] Contextual bandit recommendation engine (Vowpal Wabbit)
-- [ ] Trend / cluster discovery (HDBSCAN nightly job)
-- [ ] Catalog auto-tagger for better attribute filtering
-- [ ] Etsy + Shopify catalog sources
-- [ ] Fine-tune vision model on DeepFashion2
-- [ ] Filter bubble mitigation (explore/exploit balance)
+- [ ] Contextual bandit recommendation engine (Vowpal Wabbit) — 🔴 Very High *(real RL system design — reward tuning, exploration/exploitation balance, this is graduate-level ML territory)*
+- [ ] Trend / cluster discovery (HDBSCAN nightly job) — 🟠 High *(clustering tuning is non-obvious — picking the right parameters takes experimentation)*
+- [ ] Catalog auto-tagger for better attribute filtering — 🟠 High *(classifier accuracy tuning, handling edge cases in garment types)*
+- [ ] Etsy + Shopify catalog sources — 🟡 Medium *(same pattern as Farfetch, just more sources to maintain)*
+- [ ] Fine-tune vision model on DeepFashion2 — 🔴 Very High *(actual ML training — GPU setup, hyperparameter tuning, dataset preprocessing — this is the single hardest task in the entire roadmap)*
+- [ ] Filter bubble mitigation (explore/exploit balance) — 🟠 High *(tuning "how much randomness is too much" has no clean answer, needs real user data to validate)*
 
 ### Phase 5 — Virtual Try-On (V2)
-- [ ] "Try On" button on product detail page
-- [ ] User uploads full-body photo (stored privately)
-- [ ] Replicate API call: IDM-VTON model (user photo + product image)
-- [ ] Display AI-generated try-on result
-- [ ] AI-generated disclaimer
-- [ ] Save / share try-on result
+- [ ] "Try On" button on product detail page — 🟢 Low
+- [ ] User uploads full-body photo (stored privately) — 🟡 Medium *(privacy/consent flow adds real complexity beyond just the upload)*
+- [ ] Replicate API call: IDM-VTON model (user photo + product image) — 🟡 Medium *(API call is simple, but image alignment/quality issues will need troubleshooting)*
+- [ ] Display AI-generated try-on result — 🟢 Low
+- [ ] AI-generated disclaimer — 🟢 Low
+- [ ] Save / share try-on result — 🟢 Low
 
 ### Phase 6 — Commerce Expansion (Later)
-- [ ] Google/Apple sign-in
-- [ ] In-app checkout for select brand partners (Stripe)
-- [ ] Push notifications for wishlist price drops
+- [ ] Google/Apple sign-in — 🟡 Medium *(OAuth setup has a lot of platform-specific fiddly configuration)*
+- [ ] In-app checkout for select brand partners (Stripe) — 🟠 High *(Stripe itself is well-documented, but per-brand checkout integration + PCI-adjacent concerns raise the bar)*
+- [ ] Push notifications for wishlist price drops — 🟡 Medium *(Expo notifications API is well-documented, but scheduling + price-check logic adds a moving part)*
 
 ---
 
