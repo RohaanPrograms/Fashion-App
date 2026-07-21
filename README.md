@@ -77,6 +77,7 @@ backend/                     FastAPI backend — auth, feed, search, catalog API
     api/deps.py              Shared dependencies (current-user resolver)
     api/v1/auth.py           Auth routes
     schemas/auth.py          Request/response models
+  supabase/schema.sql        Tables, indexes, RLS policies, storage bucket
 mobile/                      React Native + Expo app (Expo Router)
   app/                       Screens — index, login, signup, home
   src/api/client.ts          fetch() wrapper for the backend
@@ -131,8 +132,12 @@ Access tokens expire after an hour; the app refreshes them in the background so 
 - [x] FastAPI skeleton with `/auth` endpoints
 - [x] React Native + Expo app: signup, login, navigation, token refresh
 - [x] Supabase project: auth
-- [ ] Supabase project: database schema + storage bucket
+- [x] Supabase project: database schema + storage bucket
 - [x] GitHub Actions CI pipeline
+
+Phase 0 is complete. The database structure lives in
+[`backend/supabase/schema.sql`](./backend/supabase/schema.sql) — re-runnable,
+so it can rebuild the database from scratch or set up a staging copy.
 
 | Phase | | Highlights |
 |---|---|---|
