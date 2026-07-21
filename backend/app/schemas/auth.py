@@ -13,6 +13,12 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RefreshRequest(BaseModel):
+    """Trade a refresh token for a fresh access token."""
+
+    refresh_token: str
+
+
 class UserOut(BaseModel):
     id: str
     email: EmailStr | None = None

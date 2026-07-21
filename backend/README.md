@@ -56,7 +56,13 @@ outside dev. `GET /health` echoes the active `environment`.
 | GET    | `/health`        | none        | Liveness + config check       |
 | POST   | `/v1/auth/signup`| none        | Create account                |
 | POST   | `/v1/auth/login` | none        | Email/password login          |
+| POST   | `/v1/auth/refresh`| none       | Swap a refresh token for a fresh access token |
 | GET    | `/v1/auth/me`    | Bearer token| Current authenticated user    |
+
+Access tokens expire after one hour. The mobile app stores the refresh token
+returned by login/signup and calls `/v1/auth/refresh` automatically just before
+expiry, so users stay signed in. A `401` from that endpoint means the refresh
+token itself is dead and the user must log in again.
 
 ## Layout
 

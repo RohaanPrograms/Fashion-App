@@ -77,7 +77,11 @@ backend/                     FastAPI backend — auth, feed, search, catalog API
     api/deps.py              Shared dependencies (current-user resolver)
     api/v1/auth.py           Auth routes
     schemas/auth.py          Request/response models
-mobile/                      React Native + Expo app          (not yet created)
+mobile/                      React Native + Expo app (Expo Router)
+  app/                       Screens — index, login, signup, home
+  src/api/client.ts          fetch() wrapper for the backend
+  src/auth/AuthContext.tsx   Session state + automatic token refresh
+  src/config.ts              Per-environment API base URL
 fashion-app-architecture.md  Full design doc — the source of truth
 ```
 
@@ -114,7 +118,10 @@ More detail in [`backend/README.md`](./backend/README.md).
 | `GET` | `/health` | — | Liveness and config check |
 | `POST` | `/v1/auth/signup` | — | Create account |
 | `POST` | `/v1/auth/login` | — | Email/password login |
+| `POST` | `/v1/auth/refresh` | — | Swap a refresh token for a fresh access token |
 | `GET` | `/v1/auth/me` | Bearer token | Current authenticated user |
+
+Access tokens expire after an hour; the app refreshes them in the background so a signed-in user stays signed in.
 
 ## Roadmap
 
@@ -122,9 +129,10 @@ More detail in [`backend/README.md`](./backend/README.md).
 
 - [x] Repo structure and environment config
 - [x] FastAPI skeleton with `/auth` endpoints
-- [ ] React Native + Expo app: signup, login, navigation
-- [ ] Supabase project: auth, schema, storage bucket
-- [ ] GitHub Actions CI pipeline
+- [x] React Native + Expo app: signup, login, navigation, token refresh
+- [x] Supabase project: auth
+- [ ] Supabase project: database schema + storage bucket
+- [x] GitHub Actions CI pipeline
 
 | Phase | | Highlights |
 |---|---|---|

@@ -17,6 +17,32 @@ export type Session = {
 
 export type AuthResponse = { user: UserOut; session: Session | null };
 
+// What we actually keep on the device between app launches.
+//
+// `expires_at` is the wall-clock time (epoch milliseconds) at which the access
+// token stops being accepted. The backend sends a *duration* (`expires_in`,
+// e.g. 3600 seconds), which is useless after the app is closed and reopened —
+// so we convert it to a fixed point in time the moment we receive it.
+export type StoredSession = {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+};
+
+// Supabase access tokens last an hour; fall back to that if the server
+// doesn't say, so we never treat a token as valid forever.
+const DEFAULT_EXPIRES_IN_SECONDS = 3600;
+
+export function toStoredSession(res: AuthResponse): StoredSession | null {
+  if (!res.session) return null;
+  const lifetimeSeconds = res.session.expires_in ?? DEFAULT_EXPIRES_IN_SECONDS;
+  return {
+    access_token: res.session.access_token,
+    refresh_token: res.session.refresh_token,
+    expires_at: Date.now() + lifetimeSeconds * 1000,
+  };
+}
+
 // A predictable error we throw when the backend responds with a non-2xx status.
 export type ApiError = { status: number; detail: string };
 
@@ -72,6 +98,12 @@ export const api = {
     request<AuthResponse>("/v1/auth/login", {
       method: "POST",
       body: { email, password },
+    }),
+
+  refresh: (refreshToken: string) =>
+    request<AuthResponse>("/v1/auth/refresh", {
+      method: "POST",
+      body: { refresh_token: refreshToken },
     }),
 
   me: (token: string) => request<UserOut>("/v1/auth/me", { token }),

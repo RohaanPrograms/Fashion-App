@@ -2,7 +2,16 @@
 
 POST /v1/auth/signup  — create account
 POST /v1/auth/login   — email/password login
+POST /v1/auth/refresh — trade a refresh token for a fresh access token
 GET  /v1/auth/me      — current user (requires Bearer token)
+
+Two tokens are in play. The *access token* is what the app sends on every
+request; Supabase expires it after about an hour so a stolen one is only
+briefly useful. The *refresh token* is long-lived and does one job: exchange
+itself for a new access token, which is what keeps a user signed in.
+
+Every call here passes its token explicitly. The Supabase client is a shared
+singleton, so we never rely on whatever session it happens to hold internally.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -12,6 +21,7 @@ from app.core.supabase_client import get_anon_client
 from app.schemas.auth import (
     AuthResponse,
     LoginRequest,
+    RefreshRequest,
     Session,
     SignupRequest,
     UserOut,
@@ -76,6 +86,30 @@ def login(body: LoginRequest) -> AuthResponse:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         ) from exc
+    return _to_auth_response(result)
+
+
+@router.post("/refresh", response_model=AuthResponse)
+def refresh(body: RefreshRequest) -> AuthResponse:
+    """Issue a new access token from a still-valid refresh token.
+
+    A 401 here means the refresh token is expired or revoked (signed out
+    elsewhere, password changed) — the client should treat it as a real
+    logout and send the user back to the login screen.
+    """
+    client = _client_or_503()
+    try:
+        result = client.auth.refresh_session(body.refresh_token)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        ) from exc
+    if result.user is None or getattr(result, "session", None) is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
     return _to_auth_response(result)
 
 
