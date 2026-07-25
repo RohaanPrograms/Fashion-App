@@ -1,0 +1,44 @@
+# Publishes the landing/ folder to GitHub Pages on every push to main.
+#
+# The site lives in a subfolder, not the repo root, so we can't use the
+# "deploy from a branch" option in the dashboard — this workflow uploads just
+# that folder instead. The live URL appears under Settings -> Pages once it runs.
+
+name: Deploy landing page
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "landing/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch: {}   # lets you trigger it manually from the Actions tab
+
+# Permissions the Pages deployment needs.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one deploy at a time; don't cancel a run mid-flight.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Upload the landing folder
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: landing
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

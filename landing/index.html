@@ -6,7 +6,7 @@
   public web page before they approve you. This is that page, and it collects
   interested emails so you have a waitlist before launch.
 
-  RENAME THE APP: it's called "Styld" here as a placeholder. Search-replace it
+  RENAME THE APP: it's called "FitFeed" here as a placeholder. Search-replace it
   for your real name once you pick one (appears in the masthead, footer, title).
 
   MAKE THE EMAIL BUTTON WORK: the waitlist buttons open the visitor's email app
@@ -24,7 +24,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Styld — fashion that learns your taste</title>
+  <title>FitFeed — fashion that learns your taste</title>
   <meta name="description" content="A mobile app that learns your style as you swipe, finds any outfit from a photo, and keeps everything inside your budget." />
   <style>
     /* ============================================================
@@ -486,7 +486,7 @@
 <body>
   <div class="shell">
     <header class="masthead">
-      <a class="mark" href="#top">Styld<b>.</b></a>
+      <a class="mark" href="#top">FitFeed<b>.</b></a>
       <div class="masthead__meta">The Style Dossier — Vol. 01</div>
     </header>
   </div>
@@ -681,11 +681,11 @@
   <footer class="site-footer">
     <div class="shell">
       <div class="site-footer__row">
-        <div class="site-footer__mark">Styld<b>.</b></div>
+        <div class="site-footer__mark">FitFeed<b>.</b></div>
         <div class="site-footer__meta">Made in Canada · © <span id="year">2026</span></div>
       </div>
       <p class="disclosure">
-        Styld earns a commission when you buy through links in the app, at no
+        FitFeed earns a commission when you buy through links in the app, at no
         extra cost to you. It's what keeps the app free to use.
       </p>
     </div>
@@ -701,7 +701,7 @@
 
     // Waitlist buttons -> open the visitor's email client, addressed to you.
     var email = document.documentElement.getAttribute("data-email");
-    var subject = encodeURIComponent("Add me to the Styld waitlist");
+    var subject = encodeURIComponent("Add me to the FitFeed waitlist");
     function openMail() { window.location.href = "mailto:" + email + "?subject=" + subject; }
     document.getElementById("join-btn").addEventListener("click", openMail);
 
