@@ -1,240 +1,738 @@
 <!DOCTYPE html>
 <!--
-  Landing page for the fashion app.
+  Landing page for the fashion app — "The Style Dossier" editorial identity.
 
   PURPOSE: affiliate networks (Sovrn, Skimlinks, AWIN...) want to see a real,
-  public web page before they approve you. This is that page. It also collects
+  public web page before they approve you. This is that page, and it collects
   interested emails so you have a waitlist before launch.
 
-  RENAME THE APP: it's called "Styld" here as a placeholder — search-replace
-  that for your real name once you pick one.
+  RENAME THE APP: it's called "Styld" here as a placeholder. Search-replace it
+  for your real name once you pick one (appears in the masthead, footer, title).
 
-  MAKE THE EMAIL BUTTON WORK: the "Join the waitlist" button currently opens
-  the visitor's email app addressed to you (change the address on the
-  data-email line below). That's the zero-setup, zero-cost option. If you'd
-  rather collect emails into a list automatically, swap it for a free Formspree
-  form later — noted in the comment by the button.
+  MAKE THE EMAIL BUTTON WORK: the waitlist buttons open the visitor's email app
+  addressed to you — change the address on the <html data-email="..."> line
+  below. That's the zero-setup, zero-cost option. To collect emails into a list
+  automatically instead, drop a free Formspree <form> in where marked.
 
-  HOSTING (all free): push this folder to GitHub and turn on GitHub Pages, or
-  drag it into Cloudflare Pages / Netlify. Full steps are in the chat.
+  HOSTING (free): push this folder to GitHub and enable GitHub Pages, or drag it
+  into Cloudflare Pages / Netlify. No build step — it's a single static file.
+
+  SELF-CONTAINED: no external fonts, scripts, or images, so it renders anywhere
+  and loads instantly.
 -->
 <html lang="en" data-email="hello@yourdomain.com">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Styld — fashion that learns your taste</title>
-  <meta name="description" content="A mobile app that learns your style as you swipe, finds any outfit from a photo, and keeps everything within your budget." />
+  <meta name="description" content="A mobile app that learns your style as you swipe, finds any outfit from a photo, and keeps everything inside your budget." />
   <style>
+    /* ============================================================
+       TOKENS — light is the default; dark overrides the same names.
+       Components read tokens only, so both themes stay in sync.
+       ============================================================ */
     :root {
-      --bg: #ffffff;
-      --bg-soft: #f6f5f3;
-      --ink: #16130f;
-      --ink-soft: #5c574f;
-      --line: #e6e3dd;
-      --accent: #16130f;
-      --accent-ink: #ffffff;
-      --radius: 16px;
-      --max: 1080px;
+      --paper:     #ECE6E2;   /* warm porcelain, faint mauve bias */
+      --panel:     #E3DBD6;   /* slightly recessed ground */
+      --ink:       #1B1418;   /* plum-black text */
+      --ink-soft:  #6A5E64;   /* muted plum-grey */
+      --line:      rgba(27, 20, 24, 0.16);
+      --line-soft: rgba(27, 20, 24, 0.09);
+      --accent:    #E00A66;   /* shocking pink, deepened for light-ground contrast */
+      --accent-ink:#FFFFFF;
+      --grain:     0.05;
+
+      --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+      --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, 'Segoe UI Mono', monospace;
+
+      --shell: 1180px;
+      --pad-x: clamp(20px, 5vw, 56px);
+      --band-y: clamp(4rem, 9vw, 8rem);
     }
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg: #14120f;
-        --bg-soft: #1d1a16;
-        --ink: #f3f0ea;
-        --ink-soft: #a9a298;
-        --line: #2c2822;
-        --accent: #f3f0ea;
-        --accent-ink: #14120f;
+        --paper:     #171015;
+        --panel:     #1F1620;
+        --ink:       #EFE6E1;
+        --ink-soft:  #A2939B;
+        --line:      rgba(239, 230, 225, 0.16);
+        --line-soft: rgba(239, 230, 225, 0.08);
+        --accent:    #FF2E82;
+        --accent-ink:#171015;
+        --grain:     0.07;
       }
     }
+    /* Viewer's explicit toggle must win over the OS preference, both ways. */
+    :root[data-theme="light"] {
+      --paper:#ECE6E2; --panel:#E3DBD6; --ink:#1B1418; --ink-soft:#6A5E64;
+      --line:rgba(27,20,24,0.16); --line-soft:rgba(27,20,24,0.09);
+      --accent:#E00A66; --accent-ink:#FFFFFF; --grain:0.05;
+    }
+    :root[data-theme="dark"] {
+      --paper:#171015; --panel:#1F1620; --ink:#EFE6E1; --ink-soft:#A2939B;
+      --line:rgba(239,230,225,0.16); --line-soft:rgba(239,230,225,0.08);
+      --accent:#FF2E82; --accent-ink:#171015; --grain:0.07;
+    }
+
+    /* ============================================================
+       BASE
+       ============================================================ */
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
     body {
       margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--paper);
       color: var(--ink);
-      background: var(--bg);
-      line-height: 1.55;
+      font-family: var(--font-sans);
+      font-size: 1.0625rem;
+      line-height: 1.6;
       -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      overflow-x: hidden;
     }
-    .wrap { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+    /* Printed-paper grain, kept faint. Decorative only. */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: var(--grain);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    main, header, footer { position: relative; z-index: 1; }
 
-    /* Header */
-    header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 22px 24px; max-width: var(--max); margin: 0 auto;
-    }
-    .brand { font-weight: 800; font-size: 1.25rem; letter-spacing: -0.02em; }
-    .brand span { opacity: 0.45; }
-
-    /* Hero */
-    .hero { padding: 64px 0 40px; text-align: center; }
-    .badge {
-      display: inline-block; font-size: 0.8rem; font-weight: 600;
-      color: var(--ink-soft); border: 1px solid var(--line);
-      padding: 6px 14px; border-radius: 999px; margin-bottom: 28px;
-    }
-    h1 {
-      font-size: clamp(2.2rem, 6vw, 4rem); line-height: 1.05;
-      letter-spacing: -0.03em; margin: 0 auto 20px; max-width: 14ch; font-weight: 800;
-    }
-    .sub {
-      font-size: clamp(1.05rem, 2.5vw, 1.3rem); color: var(--ink-soft);
-      max-width: 44ch; margin: 0 auto 34px;
-    }
-    .cta {
-      display: inline-flex; align-items: center; gap: 10px;
-      background: var(--accent); color: var(--accent-ink);
-      font-weight: 700; font-size: 1rem; text-decoration: none;
-      padding: 15px 28px; border-radius: 999px; border: none; cursor: pointer;
-      transition: transform 0.12s ease, opacity 0.12s ease;
-    }
-    .cta:hover { transform: translateY(-1px); opacity: 0.92; }
-    .cta-note { display: block; margin-top: 14px; font-size: 0.85rem; color: var(--ink-soft); }
-
-    /* Feature grid */
-    .features { padding: 40px 0 24px; }
-    .grid {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
-    }
-    @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
-    .card {
-      background: var(--bg-soft); border: 1px solid var(--line);
-      border-radius: var(--radius); padding: 26px;
-    }
-    .card .ico { font-size: 1.6rem; margin-bottom: 12px; }
-    .card h3 { margin: 0 0 6px; font-size: 1.1rem; letter-spacing: -0.01em; }
-    .card p { margin: 0; color: var(--ink-soft); font-size: 0.96rem; }
-
-    /* How it works */
-    .steps { padding: 56px 0; }
-    .steps h2, .cta-section h2 {
-      text-align: center; font-size: clamp(1.6rem, 4vw, 2.4rem);
-      letter-spacing: -0.02em; margin: 0 0 40px;
-    }
-    .step-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
-    @media (max-width: 760px) { .step-row { grid-template-columns: 1fr; } }
-    .step .n {
-      font-size: 0.8rem; font-weight: 700; color: var(--ink-soft);
-      border-bottom: 2px solid var(--line); padding-bottom: 8px; margin-bottom: 12px;
-    }
-    .step h3 { margin: 0 0 6px; font-size: 1.08rem; }
-    .step p { margin: 0; color: var(--ink-soft); font-size: 0.96rem; }
-
-    /* Final CTA */
-    .cta-section {
-      text-align: center; padding: 64px 24px; margin: 40px auto 0;
-      max-width: var(--max);
-    }
-    .cta-section .inner {
-      background: var(--bg-soft); border: 1px solid var(--line);
-      border-radius: 24px; padding: 56px 24px;
+    a { color: inherit; }
+    ::selection { background: var(--accent); color: var(--accent-ink); }
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+      border-radius: 2px;
     }
 
-    footer {
-      border-top: 1px solid var(--line); margin-top: 48px;
-      padding: 28px 24px; text-align: center; color: var(--ink-soft); font-size: 0.85rem;
+    .shell { max-width: var(--shell); margin-inline: auto; padding-inline: var(--pad-x); }
+    .band { padding-block: var(--band-y); }
+
+    /* Shared editorial label (mono, tracked, uppercase) */
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.65em;
+      margin: 0;
     }
-    footer a { color: var(--ink-soft); }
-    .disclosure { max-width: 60ch; margin: 8px auto 0; font-size: 0.78rem; opacity: 0.85; }
+    .eyebrow::before {
+      content: "";
+      width: 1.6em;
+      height: 1px;
+      background: var(--accent);
+    }
+
+    /* ============================================================
+       MASTHEAD
+       ============================================================ */
+    .masthead {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+      padding-block: 1.6rem;
+      border-bottom: 1px solid var(--line);
+    }
+    .mark {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.5rem;
+      letter-spacing: -0.02em;
+      text-decoration: none;
+    }
+    .mark b { color: var(--accent); font-weight: 700; }
+    .masthead__meta {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+    }
+    @media (max-width: 620px) { .masthead__meta { display: none; } }
+
+    /* ============================================================
+       HERO — the thesis
+       ============================================================ */
+    .hero { padding-block: clamp(3rem, 8vw, 7rem) clamp(2.5rem, 6vw, 5rem); }
+    .hero__grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 2rem;
+    }
+    @media (max-width: 860px) { .hero__grid { grid-template-columns: 1fr; } }
+
+    .hero__title {
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: clamp(3rem, 11vw, 8.2rem);
+      line-height: 0.94;
+      letter-spacing: -0.025em;
+      text-wrap: balance;
+      margin: 1.6rem 0 0;
+    }
+    .hero__title em {
+      font-style: italic;
+      color: var(--accent);
+    }
+    .hero__deck {
+      max-width: 46ch;
+      color: var(--ink-soft);
+      font-size: clamp(1.05rem, 1.6vw, 1.3rem);
+      line-height: 1.55;
+      margin: 1.8rem 0 0;
+    }
+    .hero__deck b { color: var(--ink); font-weight: 600; }
+    .hero__actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 1rem 1.4rem;
+      margin-top: 2.4rem;
+    }
+    .hero__note {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.1em;
+      color: var(--ink-soft);
+    }
+
+    /* Rotated dossier stamp in the corner — editorial flourish */
+    .stamp {
+      align-self: end;
+      justify-self: end;
+      writing-mode: vertical-rl;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.34em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+      border-left: 1px solid var(--line);
+      padding-left: 0.9rem;
+      line-height: 1.9;
+    }
+    .stamp b { color: var(--accent); font-weight: 400; }
+    @media (max-width: 860px) { .stamp { display: none; } }
+
+    /* Buttons */
+    .btn {
+      font-family: var(--font-sans);
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6em;
+      padding: 0.95em 1.7em;
+      border-radius: 100px;
+      transition: transform 0.14s ease, box-shadow 0.2s ease, background 0.2s ease;
+    }
+    .btn--accent { background: var(--accent); color: var(--accent-ink); }
+    .btn--accent:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px -12px var(--accent);
+    }
+    .btn--ghost {
+      background: transparent;
+      color: var(--ink);
+      border: 1px solid var(--line);
+      padding: 0.95em 1.5em;
+    }
+    .btn--ghost:hover { border-color: var(--accent); color: var(--accent); }
+    .btn__arrow { transition: transform 0.16s ease; }
+    .btn:hover .btn__arrow { transform: translateX(3px); }
+
+    /* ============================================================
+       TICKER — the runway schedule
+       ============================================================ */
+    .ticker {
+      border-block: 1px solid var(--line);
+      overflow: hidden;
+      padding-block: 1.05rem;
+    }
+    .ticker__track {
+      display: flex;
+      width: max-content;
+      gap: 0;
+      animation: marquee 34s linear infinite;
+    }
+    .ticker:hover .ticker__track { animation-play-state: paused; }
+    .ticker__item {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: clamp(1.4rem, 3vw, 2.1rem);
+      letter-spacing: -0.01em;
+      padding-inline: 1.1rem;
+      white-space: nowrap;
+      color: var(--ink);
+    }
+    .ticker__sep { color: var(--accent); align-self: center; font-style: normal; }
+    @keyframes marquee { to { transform: translateX(-50%); } }
+
+    /* ============================================================
+       PROPS — three value propositions, editorial (no cards)
+       ============================================================ */
+    .props__grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+    }
+    @media (max-width: 800px) { .props__grid { grid-template-columns: 1fr; } }
+    .prop {
+      padding: 0 clamp(1.2rem, 2.5vw, 2.4rem);
+      border-left: 1px solid var(--line);
+    }
+    .prop:first-child { padding-left: 0; border-left: none; }
+    @media (max-width: 800px) {
+      .prop { padding: 2rem 0; border-left: none; border-top: 1px solid var(--line); }
+      .prop:first-child { padding-top: 0; border-top: none; }
+    }
+    .prop__kicker {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 1.1rem;
+    }
+    .prop__head {
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: clamp(1.4rem, 2.4vw, 1.9rem);
+      line-height: 1.1;
+      letter-spacing: -0.015em;
+      margin: 0 0 0.7rem;
+    }
+    .prop__body { color: var(--ink-soft); margin: 0; font-size: 1rem; line-height: 1.55; }
+
+    /* ============================================================
+       AESTHETICS — the couture swatch grid (photo-free moodboard)
+       ============================================================ */
+    .aesthetics__head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 2.4rem;
+    }
+    .section-title {
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: clamp(1.9rem, 4.4vw, 3.2rem);
+      line-height: 1.02;
+      letter-spacing: -0.02em;
+      text-wrap: balance;
+      margin: 0.9rem 0 0;
+      max-width: 20ch;
+    }
+    .section-title em { font-style: italic; color: var(--accent); }
+    .aesthetics__lead { color: var(--ink-soft); max-width: 34ch; margin: 0; }
+
+    .swatches {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: clamp(0.5rem, 1.2vw, 0.9rem);
+    }
+    @media (max-width: 760px) { .swatches { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 440px) { .swatches { grid-template-columns: 1fr; } }
+
+    .swatch {
+      --sw-bg: #ccc;
+      --sw-fg: #111;
+      background: var(--sw-bg);
+      color: var(--sw-fg);
+      aspect-ratio: 4 / 5;
+      padding: 1.15rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      position: relative;
+      transition: transform 0.28s cubic-bezier(.2,.7,.3,1);
+    }
+    .swatch:hover { transform: translateY(-6px); }
+    .swatch__id {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      letter-spacing: 0.16em;
+      opacity: 0.72;
+    }
+    .swatch__name {
+      font-family: var(--font-display);
+      font-size: clamp(1.25rem, 2.4vw, 1.7rem);
+      line-height: 1.02;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+    }
+    .swatch__note {
+      font-size: 0.82rem;
+      line-height: 1.35;
+      opacity: 0.82;
+      margin: 0;
+    }
+    .swatch__foot { margin-top: auto; }
+
+    /* ============================================================
+       PROCESS — a genuine 3-step sequence (numbering earns its place)
+       ============================================================ */
+    .process__grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: clamp(1.5rem, 3vw, 3rem);
+      margin-top: 2.6rem;
+    }
+    @media (max-width: 800px) { .process__grid { grid-template-columns: 1fr; gap: 0; } }
+    .step { border-top: 2px solid var(--ink); padding-top: 1.1rem; }
+    @media (max-width: 800px) {
+      .step { border-top: 1px solid var(--line); padding-block: 1.6rem; }
+      .step:first-child { border-top: 2px solid var(--ink); }
+    }
+    .step__num {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.14em;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+    }
+    .step__head {
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: clamp(1.3rem, 2.2vw, 1.7rem);
+      letter-spacing: -0.015em;
+      margin: 0.7rem 0 0.5rem;
+    }
+    .step__body { color: var(--ink-soft); margin: 0; font-size: 0.98rem; line-height: 1.5; }
+
+    /* ============================================================
+       JOIN — waitlist call to action
+       ============================================================ */
+    .join { border-top: 1px solid var(--line); }
+    .join__inner {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      align-items: center;
+      gap: 2.5rem;
+    }
+    @media (max-width: 800px) { .join__inner { grid-template-columns: 1fr; gap: 1.8rem; } }
+    .join__title {
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: clamp(2.2rem, 5.5vw, 4rem);
+      line-height: 0.98;
+      letter-spacing: -0.025em;
+      text-wrap: balance;
+      margin: 0.9rem 0 0;
+    }
+    .join__title em { font-style: italic; color: var(--accent); }
+    .join__form { display: flex; flex-direction: column; gap: 0.9rem; align-items: flex-start; }
+    .join__note { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.08em; color: var(--ink-soft); line-height: 1.7; margin: 0; }
+
+    /* ============================================================
+       FOOTER
+       ============================================================ */
+    .site-footer {
+      border-top: 1px solid var(--line);
+      padding-block: 2.4rem 3rem;
+    }
+    .site-footer__row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 1rem 2rem;
+      flex-wrap: wrap;
+    }
+    .site-footer__mark { font-family: var(--font-display); font-size: 1.1rem; }
+    .site-footer__mark b { color: var(--accent); }
+    .disclosure {
+      color: var(--ink-soft);
+      font-size: 0.82rem;
+      line-height: 1.5;
+      max-width: 56ch;
+      margin: 1.2rem 0 0;
+    }
+    .site-footer__meta { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); }
+
+    /* ============================================================
+       MOTION — staggered reveal, opt-in via .js, opt-out on request
+       ============================================================ */
+    .js .reveal { opacity: 0; transform: translateY(18px); }
+    .js .reveal.is-in {
+      opacity: 1;
+      transform: none;
+      transition: opacity 0.7s ease, transform 0.7s cubic-bezier(.2,.7,.3,1);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .ticker__track { animation: none; }
+      .js .reveal, .js .reveal.is-in { opacity: 1; transform: none; transition: none; }
+      .btn, .swatch { transition: none; }
+    }
   </style>
 </head>
 <body>
-  <header>
-    <div class="brand">Styld<span>.</span></div>
-    <a class="cta" style="padding:10px 18px;font-size:0.9rem;" href="#waitlist">Join waitlist</a>
-  </header>
+  <div class="shell">
+    <header class="masthead">
+      <a class="mark" href="#top">Styld<b>.</b></a>
+      <div class="masthead__meta">The Style Dossier — Vol. 01</div>
+    </header>
+  </div>
 
-  <main>
-    <section class="hero wrap">
-      <span class="badge">Coming soon · iOS &amp; Android</span>
-      <h1>Fashion that learns your taste.</h1>
-      <p class="sub">
-        Swipe a feed that adapts to your style, point your camera at any outfit
-        to find it, and keep everything inside your budget.
-      </p>
-      <a class="cta" href="#waitlist">Join the waitlist →</a>
-      <span class="cta-note">Be first to try it. No spam, just a launch email.</span>
-    </section>
-
-    <section class="features wrap">
-      <div class="grid">
-        <div class="card">
-          <div class="ico">🔥</div>
-          <h3>A feed that gets you</h3>
-          <p>Swipe to like, save, or skip. It quietly learns your taste as you go — no questionnaire.</p>
-        </div>
-        <div class="card">
-          <div class="ico">📸</div>
-          <h3>Snap it, find it</h3>
-          <p>See an outfit you love? Photograph it and get matching pieces you can actually buy.</p>
-        </div>
-        <div class="card">
-          <div class="ico">💸</div>
-          <h3>Your budget, respected</h3>
-          <p>Set a price range once. Every recommendation stays inside it, from high street to designer.</p>
+  <main id="top">
+    <!-- HERO -->
+    <section class="hero">
+      <div class="shell">
+        <div class="hero__grid">
+          <div>
+            <p class="eyebrow reveal">A style app · iOS &amp; Android · Arriving 2026</p>
+            <h1 class="hero__title reveal">Fashion that <em>learns</em> your taste.</h1>
+            <p class="hero__deck reveal">
+              Swipe a feed that sharpens to <b>you</b>, photograph any outfit to find
+              where to buy it, and keep every recommendation inside your budget —
+              from the high street to the archive.
+            </p>
+            <div class="hero__actions reveal">
+              <a class="btn btn--accent" href="#join">Join the waitlist <span class="btn__arrow" aria-hidden="true">→</span></a>
+              <span class="hero__note">FIRST ACCESS · ONE EMAIL · NO NOISE</span>
+            </div>
+          </div>
+          <div class="stamp reveal">NO.&nbsp;01 &nbsp;/&nbsp; TASTE&nbsp;PROFILE &nbsp;/&nbsp; <b>EST.&nbsp;2026</b></div>
         </div>
       </div>
     </section>
 
-    <section class="steps wrap">
-      <h2>How it works</h2>
-      <div class="step-row">
-        <div class="step">
-          <div class="n">STEP 01</div>
-          <h3>Tell us your vibe</h3>
-          <p>A 30-second style intro so your very first feed already feels like you.</p>
-        </div>
-        <div class="step">
-          <div class="n">STEP 02</div>
-          <h3>Swipe &amp; save</h3>
-          <p>The more you swipe, the sharper it gets. Save favourites to a wishlist or cart.</p>
-        </div>
-        <div class="step">
-          <div class="n">STEP 03</div>
-          <h3>Tap to buy</h3>
-          <p>Head straight to the retailer to purchase. We find it; they sell it.</p>
+    <!-- TICKER -->
+    <div class="ticker" aria-hidden="true">
+      <div class="ticker__track" id="ticker">
+        <!-- filled + duplicated by script for a seamless loop; static fallback below -->
+        <span class="ticker__item">Minimalist <span class="ticker__sep">✦</span></span>
+        <span class="ticker__item">Streetwear <span class="ticker__sep">✦</span></span>
+        <span class="ticker__item">Quiet Luxury <span class="ticker__sep">✦</span></span>
+        <span class="ticker__item">Y2K <span class="ticker__sep">✦</span></span>
+        <span class="ticker__item">Athleisure <span class="ticker__sep">✦</span></span>
+        <span class="ticker__item">Boho <span class="ticker__sep">✦</span></span>
+        <span class="ticker__item">Vintage <span class="ticker__sep">✦</span></span>
+        <span class="ticker__item">Smart <span class="ticker__sep">✦</span></span>
+        <span class="ticker__item">Everyday <span class="ticker__sep">✦</span></span>
+      </div>
+    </div>
+
+    <!-- PROPS -->
+    <section class="band">
+      <div class="shell">
+        <div class="props__grid">
+          <div class="prop reveal">
+            <p class="prop__kicker">The Feed</p>
+            <h2 class="prop__head">It learns as you swipe</h2>
+            <p class="prop__body">Like, save, or skip. No questionnaire — your taste takes shape from what you actually stop on, and the feed follows.</p>
+          </div>
+          <div class="prop reveal">
+            <p class="prop__kicker">Visual Search</p>
+            <h2 class="prop__head">Photograph it, find it</h2>
+            <p class="prop__body">Spot an outfit anywhere. Point your camera and get pieces you can buy, ranked to the taste the feed already knows.</p>
+          </div>
+          <div class="prop reveal">
+            <p class="prop__kicker">Budget</p>
+            <h2 class="prop__head">Priced to your range</h2>
+            <p class="prop__body">Set it once. Everything you see stays inside it, so the beautiful thing is never the one you can't have.</p>
+          </div>
         </div>
       </div>
     </section>
 
-    <section class="cta-section" id="waitlist">
-      <div class="inner">
-        <h2>Get early access</h2>
-        <p class="sub" style="margin-bottom:28px;">
-          We're building it now. Leave your email and we'll tell you the moment it's ready.
-        </p>
-        <!--
-          Zero-setup option: this button opens the visitor's email app addressed
-          to you (the address comes from data-email on the <html> tag above).
-          To collect emails automatically instead, replace this button with a
-          free Formspree form (https://formspree.io) — paste their <form> here.
-        -->
-        <button class="cta" id="waitlist-btn">Email us to join →</button>
+    <!-- AESTHETICS -->
+    <section class="band">
+      <div class="shell">
+        <div class="aesthetics__head">
+          <div>
+            <p class="eyebrow reveal">Nine starting points</p>
+            <h2 class="section-title reveal">Every taste begins <em>somewhere</em>.</h2>
+          </div>
+          <p class="aesthetics__lead reveal">Pick the moods you're drawn to and your first feed already reads like you. It only gets closer from there.</p>
+        </div>
+        <div class="swatches">
+          <article class="swatch reveal" style="--sw-bg:#DDD7CB; --sw-fg:#2A2622;">
+            <div class="swatch__id">A</div>
+            <div class="swatch__foot">
+              <h3 class="swatch__name">Minimalist</h3>
+              <p class="swatch__note">Clean lines, neutral tones.</p>
+            </div>
+          </article>
+          <article class="swatch reveal" style="--sw-bg:#2C2C2E; --sw-fg:#F0ECE6;">
+            <div class="swatch__id">B</div>
+            <div class="swatch__foot">
+              <h3 class="swatch__name">Streetwear</h3>
+              <p class="swatch__note">Hoodies, sneakers, graphics.</p>
+            </div>
+          </article>
+          <article class="swatch reveal" style="--sw-bg:#B7996F; --sw-fg:#2A2016;">
+            <div class="swatch__id">C</div>
+            <div class="swatch__foot">
+              <h3 class="swatch__name">Quiet Luxury</h3>
+              <p class="swatch__note">Understated, expensive-quiet.</p>
+            </div>
+          </article>
+          <article class="swatch reveal" style="--sw-bg:#E7A4C4; --sw-fg:#3A1526;">
+            <div class="swatch__id">D</div>
+            <div class="swatch__foot">
+              <h3 class="swatch__name">Y2K</h3>
+              <p class="swatch__note">Low-rise, shine, nostalgia.</p>
+            </div>
+          </article>
+          <article class="swatch reveal" style="--sw-bg:#54606B; --sw-fg:#EEF1F3;">
+            <div class="swatch__id">E</div>
+            <div class="swatch__foot">
+              <h3 class="swatch__name">Athleisure</h3>
+              <p class="swatch__note">Technical, easy, on the move.</p>
+            </div>
+          </article>
+          <article class="swatch reveal" style="--sw-bg:#9A7B4B; --sw-fg:#231A0E;">
+            <div class="swatch__id">F</div>
+            <div class="swatch__foot">
+              <h3 class="swatch__name">Boho</h3>
+              <p class="swatch__note">Flowy fabrics, earthy colour.</p>
+            </div>
+          </article>
+          <article class="swatch reveal" style="--sw-bg:#7B5844; --sw-fg:#F2E7DC;">
+            <div class="swatch__id">G</div>
+            <div class="swatch__foot">
+              <h3 class="swatch__name">Vintage</h3>
+              <p class="swatch__note">Thrifted, retro silhouettes.</p>
+            </div>
+          </article>
+          <article class="swatch reveal" style="--sw-bg:#22303F; --sw-fg:#E6ECF2;">
+            <div class="swatch__id">H</div>
+            <div class="swatch__foot">
+              <h3 class="swatch__name">Smart</h3>
+              <p class="swatch__note">Blazers, tailored trousers.</p>
+            </div>
+          </article>
+          <article class="swatch reveal" style="--sw-bg:#6E7788; --sw-fg:#F3F5F7;">
+            <div class="swatch__id">I</div>
+            <div class="swatch__foot">
+              <h3 class="swatch__name">Everyday</h3>
+              <p class="swatch__note">Simple, dependable basics.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- PROCESS -->
+    <section class="band">
+      <div class="shell">
+        <p class="eyebrow reveal">How it works</p>
+        <h2 class="section-title reveal">Three moves, then it's <em>yours</em>.</h2>
+        <div class="process__grid">
+          <div class="step reveal">
+            <div class="step__num">STEP 01</div>
+            <h3 class="step__head">Set the tone</h3>
+            <p class="step__body">A thirty-second style intro, so your very first feed already reads like you — not like everyone.</p>
+          </div>
+          <div class="step reveal">
+            <div class="step__num">STEP 02</div>
+            <h3 class="step__head">Swipe &amp; save</h3>
+            <p class="step__body">The more you move, the sharper it gets. Keep what you love in a wishlist or cart for later.</p>
+          </div>
+          <div class="step reveal">
+            <div class="step__num">STEP 03</div>
+            <h3 class="step__head">Tap through</h3>
+            <p class="step__body">Buy straight from the retailer. We surface the piece; they handle the sale.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- JOIN -->
+    <section class="join band" id="join">
+      <div class="shell">
+        <div class="join__inner">
+          <div>
+            <p class="eyebrow reveal">The waitlist</p>
+            <h2 class="join__title reveal">Be first through <em>the door</em>.</h2>
+          </div>
+          <div class="join__form reveal">
+            <!--
+              Zero-setup: this button opens the visitor's email app addressed to
+              you (address from <html data-email>). To capture emails into a list
+              automatically, replace this button with a free Formspree <form>.
+            -->
+            <button class="btn btn--accent" id="join-btn" type="button">Request early access <span class="btn__arrow" aria-hidden="true">→</span></button>
+            <p class="join__note">We're building it now.<br />Leave your email and we'll tell you the moment it's live.</p>
+          </div>
+        </div>
       </div>
     </section>
   </main>
 
-  <footer>
-    <div class="wrap">
-      <div>© <span id="year"></span> Styld. Made in the UK.</div>
+  <footer class="site-footer">
+    <div class="shell">
+      <div class="site-footer__row">
+        <div class="site-footer__mark">Styld<b>.</b></div>
+        <div class="site-footer__meta">Made in Canada · © <span id="year">2026</span></div>
+      </div>
       <p class="disclosure">
         Styld earns a commission when you buy through links in the app, at no
-        extra cost to you. It helps keep the app free.
+        extra cost to you. It's what keeps the app free to use.
       </p>
     </div>
   </footer>
 
   <script>
-    // Fill the year automatically so the footer never goes stale.
+    // Signal that JS is available, so the reveal animation only hides content
+    // when it can also un-hide it. Without JS, everything stays visible.
+    document.documentElement.classList.add("js");
+
+    // Current year in the footer.
     document.getElementById("year").textContent = new Date().getFullYear();
 
-    // Wire the waitlist button to open the visitor's email client.
+    // Waitlist buttons -> open the visitor's email client, addressed to you.
     var email = document.documentElement.getAttribute("data-email");
     var subject = encodeURIComponent("Add me to the Styld waitlist");
-    document.getElementById("waitlist-btn").addEventListener("click", function () {
-      window.location.href = "mailto:" + email + "?subject=" + subject;
-    });
+    function openMail() { window.location.href = "mailto:" + email + "?subject=" + subject; }
+    document.getElementById("join-btn").addEventListener("click", openMail);
+
+    // Duplicate the ticker items once so the marquee loops seamlessly
+    // (the animation translates by exactly -50%).
+    var track = document.getElementById("ticker");
+    if (track) { track.innerHTML += track.innerHTML; }
+
+    // Staggered scroll reveal, unless the visitor prefers reduced motion.
+    var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var reveals = Array.prototype.slice.call(document.querySelectorAll(".reveal"));
+    if (reduce || !("IntersectionObserver" in window)) {
+      reveals.forEach(function (el) { el.classList.add("is-in"); });
+    } else {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            var el = entry.target;
+            // Stagger siblings within the same row for a considered cascade.
+            var siblings = Array.prototype.slice.call(el.parentNode.children).filter(function (n) {
+              return n.classList.contains("reveal");
+            });
+            var i = Math.max(0, siblings.indexOf(el));
+            el.style.transitionDelay = (i * 80) + "ms";
+            el.classList.add("is-in");
+            io.unobserve(el);
+          }
+        });
+      }, { threshold: 0.16, rootMargin: "0px 0px -8% 0px" });
+      reveals.forEach(function (el) { io.observe(el); });
+    }
   </script>
 </body>
 </html>
