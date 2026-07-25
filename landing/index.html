@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<!--
+  Landing page for the fashion app.
+
+  PURPOSE: affiliate networks (Sovrn, Skimlinks, AWIN...) want to see a real,
+  public web page before they approve you. This is that page. It also collects
+  interested emails so you have a waitlist before launch.
+
+  RENAME THE APP: it's called "Styld" here as a placeholder — search-replace
+  that for your real name once you pick one.
+
+  MAKE THE EMAIL BUTTON WORK: the "Join the waitlist" button currently opens
+  the visitor's email app addressed to you (change the address on the
+  data-email line below). That's the zero-setup, zero-cost option. If you'd
+  rather collect emails into a list automatically, swap it for a free Formspree
+  form later — noted in the comment by the button.
+
+  HOSTING (all free): push this folder to GitHub and turn on GitHub Pages, or
+  drag it into Cloudflare Pages / Netlify. Full steps are in the chat.
+-->
+<html lang="en" data-email="hello@yourdomain.com">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Styld — fashion that learns your taste</title>
+  <meta name="description" content="A mobile app that learns your style as you swipe, finds any outfit from a photo, and keeps everything within your budget." />
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-soft: #f6f5f3;
+      --ink: #16130f;
+      --ink-soft: #5c574f;
+      --line: #e6e3dd;
+      --accent: #16130f;
+      --accent-ink: #ffffff;
+      --radius: 16px;
+      --max: 1080px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #14120f;
+        --bg-soft: #1d1a16;
+        --ink: #f3f0ea;
+        --ink-soft: #a9a298;
+        --line: #2c2822;
+        --accent: #f3f0ea;
+        --accent-ink: #14120f;
+      }
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+
+    /* Header */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 22px 24px; max-width: var(--max); margin: 0 auto;
+    }
+    .brand { font-weight: 800; font-size: 1.25rem; letter-spacing: -0.02em; }
+    .brand span { opacity: 0.45; }
+
+    /* Hero */
+    .hero { padding: 64px 0 40px; text-align: center; }
+    .badge {
+      display: inline-block; font-size: 0.8rem; font-weight: 600;
+      color: var(--ink-soft); border: 1px solid var(--line);
+      padding: 6px 14px; border-radius: 999px; margin-bottom: 28px;
+    }
+    h1 {
+      font-size: clamp(2.2rem, 6vw, 4rem); line-height: 1.05;
+      letter-spacing: -0.03em; margin: 0 auto 20px; max-width: 14ch; font-weight: 800;
+    }
+    .sub {
+      font-size: clamp(1.05rem, 2.5vw, 1.3rem); color: var(--ink-soft);
+      max-width: 44ch; margin: 0 auto 34px;
+    }
+    .cta {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: var(--accent); color: var(--accent-ink);
+      font-weight: 700; font-size: 1rem; text-decoration: none;
+      padding: 15px 28px; border-radius: 999px; border: none; cursor: pointer;
+      transition: transform 0.12s ease, opacity 0.12s ease;
+    }
+    .cta:hover { transform: translateY(-1px); opacity: 0.92; }
+    .cta-note { display: block; margin-top: 14px; font-size: 0.85rem; color: var(--ink-soft); }
+
+    /* Feature grid */
+    .features { padding: 40px 0 24px; }
+    .grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+    }
+    @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--bg-soft); border: 1px solid var(--line);
+      border-radius: var(--radius); padding: 26px;
+    }
+    .card .ico { font-size: 1.6rem; margin-bottom: 12px; }
+    .card h3 { margin: 0 0 6px; font-size: 1.1rem; letter-spacing: -0.01em; }
+    .card p { margin: 0; color: var(--ink-soft); font-size: 0.96rem; }
+
+    /* How it works */
+    .steps { padding: 56px 0; }
+    .steps h2, .cta-section h2 {
+      text-align: center; font-size: clamp(1.6rem, 4vw, 2.4rem);
+      letter-spacing: -0.02em; margin: 0 0 40px;
+    }
+    .step-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    @media (max-width: 760px) { .step-row { grid-template-columns: 1fr; } }
+    .step .n {
+      font-size: 0.8rem; font-weight: 700; color: var(--ink-soft);
+      border-bottom: 2px solid var(--line); padding-bottom: 8px; margin-bottom: 12px;
+    }
+    .step h3 { margin: 0 0 6px; font-size: 1.08rem; }
+    .step p { margin: 0; color: var(--ink-soft); font-size: 0.96rem; }
+
+    /* Final CTA */
+    .cta-section {
+      text-align: center; padding: 64px 24px; margin: 40px auto 0;
+      max-width: var(--max);
+    }
+    .cta-section .inner {
+      background: var(--bg-soft); border: 1px solid var(--line);
+      border-radius: 24px; padding: 56px 24px;
+    }
+
+    footer {
+      border-top: 1px solid var(--line); margin-top: 48px;
+      padding: 28px 24px; text-align: center; color: var(--ink-soft); font-size: 0.85rem;
+    }
+    footer a { color: var(--ink-soft); }
+    .disclosure { max-width: 60ch; margin: 8px auto 0; font-size: 0.78rem; opacity: 0.85; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">Styld<span>.</span></div>
+    <a class="cta" style="padding:10px 18px;font-size:0.9rem;" href="#waitlist">Join waitlist</a>
+  </header>
+
+  <main>
+    <section class="hero wrap">
+      <span class="badge">Coming soon · iOS &amp; Android</span>
+      <h1>Fashion that learns your taste.</h1>
+      <p class="sub">
+        Swipe a feed that adapts to your style, point your camera at any outfit
+        to find it, and keep everything inside your budget.
+      </p>
+      <a class="cta" href="#waitlist">Join the waitlist →</a>
+      <span class="cta-note">Be first to try it. No spam, just a launch email.</span>
+    </section>
+
+    <section class="features wrap">
+      <div class="grid">
+        <div class="card">
+          <div class="ico">🔥</div>
+          <h3>A feed that gets you</h3>
+          <p>Swipe to like, save, or skip. It quietly learns your taste as you go — no questionnaire.</p>
+        </div>
+        <div class="card">
+          <div class="ico">📸</div>
+          <h3>Snap it, find it</h3>
+          <p>See an outfit you love? Photograph it and get matching pieces you can actually buy.</p>
+        </div>
+        <div class="card">
+          <div class="ico">💸</div>
+          <h3>Your budget, respected</h3>
+          <p>Set a price range once. Every recommendation stays inside it, from high street to designer.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="steps wrap">
+      <h2>How it works</h2>
+      <div class="step-row">
+        <div class="step">
+          <div class="n">STEP 01</div>
+          <h3>Tell us your vibe</h3>
+          <p>A 30-second style intro so your very first feed already feels like you.</p>
+        </div>
+        <div class="step">
+          <div class="n">STEP 02</div>
+          <h3>Swipe &amp; save</h3>
+          <p>The more you swipe, the sharper it gets. Save favourites to a wishlist or cart.</p>
+        </div>
+        <div class="step">
+          <div class="n">STEP 03</div>
+          <h3>Tap to buy</h3>
+          <p>Head straight to the retailer to purchase. We find it; they sell it.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-section" id="waitlist">
+      <div class="inner">
+        <h2>Get early access</h2>
+        <p class="sub" style="margin-bottom:28px;">
+          We're building it now. Leave your email and we'll tell you the moment it's ready.
+        </p>
+        <!--
+          Zero-setup option: this button opens the visitor's email app addressed
+          to you (the address comes from data-email on the <html> tag above).
+          To collect emails automatically instead, replace this button with a
+          free Formspree form (https://formspree.io) — paste their <form> here.
+        -->
+        <button class="cta" id="waitlist-btn">Email us to join →</button>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <div>© <span id="year"></span> Styld. Made in the UK.</div>
+      <p class="disclosure">
+        Styld earns a commission when you buy through links in the app, at no
+        extra cost to you. It helps keep the app free.
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    // Fill the year automatically so the footer never goes stale.
+    document.getElementById("year").textContent = new Date().getFullYear();
+
+    // Wire the waitlist button to open the visitor's email client.
+    var email = document.documentElement.getAttribute("data-email");
+    var subject = encodeURIComponent("Add me to the Styld waitlist");
+    document.getElementById("waitlist-btn").addEventListener("click", function () {
+      window.location.href = "mailto:" + email + "?subject=" + subject;
+    });
+  </script>
+</body>
+</html>
