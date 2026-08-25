@@ -4,3 +4,7 @@ pydantic[email]==2.10.4
 pydantic-settings==2.7.1
 supabase==2.11.0
 python-dotenv==1.0.1
+# Verifies access tokens locally instead of asking Supabase on every request.
+# It already arrives as a dependency of supabase, but we import it directly, so
+# it is pinned here rather than left to chance if supabase ever drops it.
+PyJWT==2.13.0

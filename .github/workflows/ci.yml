@@ -30,13 +30,17 @@ jobs:
           cache-dependency-path: backend/requirements.txt
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Byte-compile all source
         run: python -m compileall app
 
       - name: Verify the app imports cleanly
         run: python -c "import app.main; print('app imports OK')"
+
+      # The tests stub Supabase, so this needs no credentials and no network.
+      - name: Run tests
+        run: python -m pytest -q
 
   mobile:
     name: Mobile (TypeScript)

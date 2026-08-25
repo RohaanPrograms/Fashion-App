@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = ""
     SUPABASE_ANON_KEY: str = ""
     SUPABASE_SERVICE_ROLE_KEY: str = ""
+    # Signs and verifies access tokens. With it set, the API can check a token
+    # itself instead of asking Supabase to check every request. Unused until
+    # that change lands; blank keeps the current behaviour.
+    SUPABASE_JWT_SECRET: str = ""
 
     # Later phases — present so the app boots even when unset.
     PINECONE_API_KEY: str = ""

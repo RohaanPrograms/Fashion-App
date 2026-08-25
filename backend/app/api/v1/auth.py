@@ -14,9 +14,12 @@ Every call here passes its token explicitly. The Supabase client is a shared
 singleton, so we never rely on whatever session it happens to hold internally.
 """
 
+from typing import NoReturn
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.deps import get_current_user
+from app.core.errors import is_infrastructure_error, log_upstream_failure
 from app.core.supabase_client import get_anon_client
 from app.schemas.auth import (
     AuthResponse,
@@ -56,6 +59,33 @@ def _client_or_503():
         ) from exc
 
 
+# Shown whenever Supabase could not be reached. Deliberately says nothing about
+# credentials, because when the request never landed we know nothing about them.
+UNAVAILABLE_DETAIL = (
+    "The authentication service is temporarily unavailable. Please try again shortly."
+)
+
+
+def _fail(
+    operation: str, exc: Exception, *, auth_status: int, auth_detail: str
+) -> NoReturn:
+    """Turn an exception from Supabase into the right HTTP error.
+
+    Unreachable service -> 503 with a neutral message.
+    Service said no     -> the endpoint's own auth status and message.
+
+    Either way the caller gets a fixed, hand-written string. The exception's own
+    text goes to the logs only: it can contain hostnames, ports and internal
+    failure detail, and it was previously returned straight to the client.
+    """
+    log_upstream_failure(operation, exc)
+    if is_infrastructure_error(exc):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=UNAVAILABLE_DETAIL
+        ) from exc
+    raise HTTPException(status_code=auth_status, detail=auth_detail) from exc
+
+
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 def signup(body: SignupRequest) -> AuthResponse:
     client = _client_or_503()
@@ -64,9 +94,15 @@ def signup(body: SignupRequest) -> AuthResponse:
             {"email": body.email, "password": body.password}
         )
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        ) from exc
+        _fail(
+            "signup",
+            exc,
+            auth_status=status.HTTP_400_BAD_REQUEST,
+            auth_detail=(
+                "Could not create the account. The email may already be "
+                "registered, or the password may not meet requirements."
+            ),
+        )
     if result.user is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Signup failed"
@@ -82,10 +118,12 @@ def login(body: LoginRequest) -> AuthResponse:
             {"email": body.email, "password": body.password}
         )
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-        ) from exc
+        _fail(
+            "login",
+            exc,
+            auth_status=status.HTTP_401_UNAUTHORIZED,
+            auth_detail="Invalid email or password",
+        )
     return _to_auth_response(result)
 
 
@@ -101,10 +139,12 @@ def refresh(body: RefreshRequest) -> AuthResponse:
     try:
         result = client.auth.refresh_session(body.refresh_token)
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired refresh token",
-        ) from exc
+        _fail(
+            "refresh",
+            exc,
+            auth_status=status.HTTP_401_UNAUTHORIZED,
+            auth_detail="Invalid or expired refresh token",
+        )
     if result.user is None or getattr(result, "session", None) is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
