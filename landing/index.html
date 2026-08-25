@@ -702,17 +702,18 @@
           </div>
           <div class="join__form reveal">
             <!--
-              Submits to Formspree, which emails you each signup and keeps a list
-              you can export - no server of your own required.
+              Submits to Formspree, which receives the POST, emails the address
+              in <html data-email>, and keeps an exportable list. No server of
+              our own is involved, which is what lets this work on GitHub Pages.
 
-              SETUP: replace FORM_ID in the action below with the id from your
-              Formspree endpoint (it looks like https://formspree.io/f/abcdwxyz).
-              Until you do, the form stays usable: it stops itself from posting
-              to a dead endpoint and shows the contact address instead.
+              To point at a different form, change the id in the action below;
+              Formspree shows it as https://formspree.io/f/<id>. If it is ever
+              set back to the literal FORM_ID, the script detects that and shows
+              the contact address instead of posting to a dead endpoint.
 
               Without JavaScript the form still posts to Formspree natively.
             -->
-            <form id="join-form" class="join__row" action="https://formspree.io/f/FORM_ID" method="POST">
+            <form id="join-form" class="join__row" action="https://formspree.io/f/mzeplveq" method="POST">
               <label class="sr-only" for="join-email">Your email address</label>
               <input class="field" id="join-email" type="email" name="email" required autocomplete="email" placeholder="you@email.com" />
               <input type="hidden" name="_subject" value="New FitFeed waitlist signup" />
