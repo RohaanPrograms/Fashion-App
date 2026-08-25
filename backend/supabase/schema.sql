@@ -59,7 +59,7 @@ create table if not exists public.users (
   id uuid primary key references auth.users (id) on delete cascade,
   email text,
 
-  -- ---- Onboarding quiz answers (architecture doc, section 2) ----
+  -- ---- Onboarding quiz answers ----
   -- Screen 1: what the user shops for. Applied as a catalogue filter.
   gender_preference text check (gender_preference in ('womens', 'mens', 'both')),
   -- Screen 2: usual spend per item. Seeds the default budget filter.
@@ -144,7 +144,7 @@ create table if not exists public.products (
   image_url text,
 
   -- Flagged rather than deleted when out of stock, so trend analysis keeps
-  -- its history (architecture doc, "keeping catalog fresh").
+  -- its history, which is what keeps catalogue freshness measurable.
   in_stock boolean not null default true,
   category text,
 
@@ -156,7 +156,7 @@ create table if not exists public.products (
   -- Phase 1: the matching vector in Pinecone.
   pinecone_id text,
   -- Which model produced that vector. Mixing vectors from different models
-  -- silently returns nonsense results (architecture doc, risk 11), so we
+  -- silently returns nonsense results, so we
   -- record the version and re-embed the catalogue when the model changes.
   embedding_model_version text,
 
@@ -192,7 +192,7 @@ create table if not exists public.interactions (
 
   -- Milliseconds spent looking at the item before acting. Capped at 60s
   -- because anything longer means the user put their phone down, not that
-  -- they were fascinated (architecture doc, risk 5).
+  -- they were fascinated.
   dwell_time_ms integer check (dwell_time_ms >= 0 and dwell_time_ms <= 60000),
 
   source text not null check (source in ('feed', 'search', 'similar')),

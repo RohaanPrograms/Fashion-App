@@ -52,7 +52,7 @@ Swipe a feed that adapts to your taste · Point your camera at any outfit to fin
 └─────────────────────────────────────────────────────────┘
 ```
 
-[`fashion-app-architecture.md`](./fashion-app-architecture.md) is the source of truth — stack decisions, data model, ML pipeline, and phasing all live there.
+Stack decisions, the data model, the ML pipeline, and phasing are tracked separately in the project's internal design notes.
 
 ## Tech stack
 
@@ -83,7 +83,6 @@ mobile/                      React Native + Expo app (Expo Router)
   src/api/client.ts          fetch() wrapper for the backend
   src/auth/AuthContext.tsx   Session state + automatic token refresh
   src/config.ts              Per-environment API base URL
-fashion-app-architecture.md  Full design doc — the source of truth
 ```
 
 ## Quick start
@@ -147,8 +146,6 @@ so it can rebuild the database from scratch or set up a staging copy.
 | 4 | **Scale Intelligence** <sub>post-MVP</sub> | Contextual bandit, HDBSCAN trend clustering, fine-tuned vision model, filter-bubble mitigation |
 | 5 | **Virtual Try-On** <sub>v2</sub> | IDM-VTON via Replicate, private photo storage, save and share results |
 | 6 | **Commerce Expansion** <sub>later</sub> | Google/Apple sign-in, in-app Stripe checkout, wishlist price-drop alerts |
-
-Full breakdown in [`fashion-app-architecture.md`](./fashion-app-architecture.md#build-phases).
 
 ---
 
