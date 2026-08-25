@@ -20,7 +20,7 @@
   SELF-CONTAINED: no external fonts, scripts, or images, so it renders anywhere
   and loads instantly.
 -->
-<html lang="en" data-email="rohaanmrz@gmail.com">
+<html lang="en" data-email="fittfeed@gmail.com">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -440,6 +440,42 @@
     .join__title em { font-style: italic; color: var(--accent); }
     .join__form { display: flex; flex-direction: column; gap: 0.9rem; align-items: flex-start; }
     .join__note { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.08em; color: var(--ink-soft); line-height: 1.7; margin: 0; }
+    .join__row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; width: 100%; }
+    .field {
+      font-family: var(--font-sans);
+      font-size: 1rem;
+      color: var(--ink);
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 100px;
+      padding: 0.95em 1.4em;
+      flex: 1 1 14rem;
+      min-width: 0;
+      transition: border-color 0.16s ease, box-shadow 0.2s ease;
+    }
+    .field::placeholder { color: var(--ink-soft); }
+    .field:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+    }
+    .btn[disabled] { opacity: 0.55; cursor: default; transform: none; box-shadow: none; }
+    .join__status {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      line-height: 1.7;
+      color: var(--ink-soft);
+      margin: 0;
+      min-height: 1.3em;
+    }
+    .join__status[data-state="error"] { color: var(--accent); }
+    /* Exposed to screen readers only: the input still needs a real label even
+       though the placeholder makes its purpose obvious to sighted visitors. */
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
 
     /* ============================================================
        FOOTER
@@ -666,11 +702,25 @@
           </div>
           <div class="join__form reveal">
             <!--
-              Zero-setup: this button opens the visitor's email app addressed to
-              you (address from <html data-email>). To capture emails into a list
-              automatically, replace this button with a free Formspree <form>.
+              Submits to Formspree, which emails you each signup and keeps a list
+              you can export - no server of your own required.
+
+              SETUP: replace FORM_ID in the action below with the id from your
+              Formspree endpoint (it looks like https://formspree.io/f/abcdwxyz).
+              Until you do, the form stays usable: it stops itself from posting
+              to a dead endpoint and shows the contact address instead.
+
+              Without JavaScript the form still posts to Formspree natively.
             -->
-            <button class="btn btn--accent" id="join-btn" type="button">Request early access <span class="btn__arrow" aria-hidden="true">→</span></button>
+            <form id="join-form" class="join__row" action="https://formspree.io/f/FORM_ID" method="POST">
+              <label class="sr-only" for="join-email">Your email address</label>
+              <input class="field" id="join-email" type="email" name="email" required autocomplete="email" placeholder="you@email.com" />
+              <input type="hidden" name="_subject" value="New FitFeed waitlist signup" />
+              <!-- Honeypot: bots fill hidden fields in, humans never see this one. -->
+              <input type="text" name="_gotcha" tabindex="-1" autocomplete="off" aria-hidden="true" style="display:none" />
+              <button class="btn btn--accent" type="submit">Request early access <span class="btn__arrow" aria-hidden="true">→</span></button>
+            </form>
+            <p class="join__status" id="join-status" role="status" aria-live="polite"></p>
             <p class="join__note">We're building it now.<br />Leave your email and we'll tell you the moment it's live.</p>
           </div>
         </div>
@@ -699,11 +749,52 @@
     // Current year in the footer.
     document.getElementById("year").textContent = new Date().getFullYear();
 
-    // Waitlist buttons -> open the visitor's email client, addressed to you.
+    // Waitlist -> post to Formspree in the background so the visitor never
+    // leaves the page. This replaced a mailto: link, which silently does
+    // nothing on any machine with no desktop mail client configured.
     var email = document.documentElement.getAttribute("data-email");
-    var subject = encodeURIComponent("Add me to the FitFeed waitlist");
-    function openMail() { window.location.href = "mailto:" + email + "?subject=" + subject; }
-    document.getElementById("join-btn").addEventListener("click", openMail);
+    var joinForm = document.getElementById("join-form");
+    var joinStatus = document.getElementById("join-status");
+
+    function say(message, state) {
+      joinStatus.textContent = message;
+      if (state) { joinStatus.setAttribute("data-state", state); }
+      else { joinStatus.removeAttribute("data-state"); }
+    }
+
+    if (joinForm) {
+      joinForm.addEventListener("submit", function (event) {
+        // Endpoint not filled in yet - do not post into the void.
+        if (joinForm.getAttribute("action").indexOf("FORM_ID") !== -1) {
+          event.preventDefault();
+          say("The waitlist form isn't connected yet - email " + email + " and we'll add you.", "error");
+          return;
+        }
+
+        // No fetch() available: let the browser submit the form normally.
+        if (!window.fetch) { return; }
+
+        event.preventDefault();
+        var submitBtn = joinForm.querySelector("button[type=submit]");
+        submitBtn.disabled = true;
+        say("Sending…");
+
+        fetch(joinForm.getAttribute("action"), {
+          method: "POST",
+          body: new FormData(joinForm),
+          headers: { "Accept": "application/json" }
+        }).then(function (response) {
+          if (response.ok) {
+            joinForm.reset();
+            say("You're on the list. We'll tell you the moment it's live.");
+          } else {
+            say("That didn't go through - email " + email + " instead.", "error");
+          }
+        })["catch"](function () {
+          say("That didn't go through - email " + email + " instead.", "error");
+        }).then(function () { submitBtn.disabled = false; });
+      });
+    }
 
     // Duplicate the ticker items once so the marquee loops seamlessly
     // (the animation translates by exactly -50%).
