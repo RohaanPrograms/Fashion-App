@@ -9,10 +9,11 @@
   RENAME THE APP: it's called "FitFeed" here as a placeholder. Search-replace it
   for your real name once you pick one (appears in the masthead, footer, title).
 
-  MAKE THE EMAIL BUTTON WORK: the waitlist buttons open the visitor's email app
-  addressed to you — change the address on the <html data-email="..."> line
-  below. That's the zero-setup, zero-cost option. To collect emails into a list
-  automatically instead, drop a free Formspree <form> in where marked.
+  WAITLIST: the form posts to Formspree, which emails each signup to the owner
+  and keeps an exportable list. The endpoint id is on the <form> in the join
+  section; the contact address shown on failure is the <html data-email="...">
+  attribute below. This replaced a mailto: link, which did nothing on machines
+  with no desktop mail client registered.
 
   HOSTING (free): push this folder to GitHub and enable GitHub Pages, or drag it
   into Cloudflare Pages / Netlify. No build step — it's a single static file.
@@ -26,6 +27,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FitFeed — fashion that learns your taste</title>
   <meta name="description" content="A mobile app that learns your style as you swipe, finds any outfit from a photo, and keeps everything inside your budget." />
+
+  <!--
+    AWIN PUBLISHER APPLICATION
+    ==========================
+    The owner of this site is applying to Awin as a publisher, to use Awin
+    affiliate links for the products the app surfaces. Awin advises that naming
+    them in the site source helps their review team match the site to the
+    application, so this note is deliberate - do not delete it.
+
+    Contact for the application: see the data-email attribute on <html> above.
+
+    SITE VERIFICATION IS A SEPARATE STEP and is not satisfied by this comment.
+    Awin issues a verification tag that is unique to your account; find it under
+    your Awin dashboard's site verification section. Paste it in place of the
+    commented-out line below (confirm the exact attribute name against what the
+    dashboard shows - it is typically "verify-awin"):
+  -->
+  <!-- <meta name="verify-awin" content="PASTE-THE-CODE-FROM-YOUR-AWIN-DASHBOARD" /> -->
   <style>
     /* ============================================================
        TOKENS — light is the default; dark overrides the same names.
