@@ -153,10 +153,17 @@ create table if not exists public.products (
   -- changing shape as it improves.
   attributes jsonb not null default '{}'::jsonb,
 
-  -- Phase 1: the matching vector in Pinecone.
-  pinecone_id text,
-  -- Which model produced that vector. Mixing vectors from different models
-  -- silently returns nonsense results, so we
+  -- H&M sells one garment as several articles, one per colourway, and their
+  -- vectors are nearly identical. Without grouping them the feed shows the
+  -- same jumper eight times.
+  product_code text,
+
+  -- Purchase count from the training data. Ranks the feed before a user has
+  -- enough likes to personalise from.
+  popularity integer not null default 0,
+
+  -- Which model produced this product's vector. Mixing vectors from different
+  -- models silently returns nonsense results, so we
   -- record the version and re-embed the catalogue when the model changes.
   embedding_model_version text,
 
@@ -166,14 +173,53 @@ create table if not exists public.products (
   unique (source, source_id)
 );
 
+-- "create table if not exists" skips the block above entirely when products
+-- already exists, so column changes must also be applied explicitly. Each
+-- line is a no-op if the change is already in place.
+alter table public.products drop column if exists pinecone_id;
+alter table public.products add column if not exists product_code text;
+alter table public.products add column if not exists popularity integer not null default 0;
+
 -- Indexes matching how the feed and search actually query this table.
 -- Without them Postgres reads every row; fine at 500 products, not at 500k.
 create index if not exists products_category_idx on public.products (category);
 create index if not exists products_price_idx on public.products (price);
 create index if not exists products_in_stock_idx on public.products (in_stock) where in_stock;
-create index if not exists products_pinecone_id_idx on public.products (pinecone_id);
+create index if not exists products_popularity_idx on public.products (popularity desc);
+create index if not exists products_product_code_idx on public.products (product_code);
 -- GIN is the index type for searching inside jsonb, e.g. attributes->>'colour'.
 create index if not exists products_attributes_idx on public.products using gin (attributes);
+
+
+-- =====================================================================
+--  product_vectors — the trained ALS item vectors
+-- =====================================================================
+-- Kept in its own table rather than as columns on products because 64
+-- floats would otherwise be dragged along by every ordinary product query.
+-- Postgres is the source of truth; the API loads the whole table into
+-- memory once at startup (5,000 x 64 floats is about 1.3 MB, so a vector
+-- database would be pure overhead).
+create table if not exists public.product_vectors (
+  product_id uuid primary key references public.products (id) on delete cascade,
+
+  -- The learned vector. Postgres real[] rather than jsonb: half the storage
+  -- and it round-trips to numpy without parsing.
+  vector real[] not null,
+
+  -- Which training run produced this. Mixing vectors from different runs
+  -- silently returns nonsense rather than erroring, so every row records it.
+  model_version text not null,
+
+  created_at timestamptz not null default now()
+);
+
+create index if not exists product_vectors_model_idx
+  on public.product_vectors (model_version);
+
+-- Vectors are not secret, but nothing in the app needs them client-side:
+-- ranking happens server-side. No policy is granted to anon/authenticated,
+-- so only the service role (which bypasses RLS) can read them.
+alter table public.product_vectors enable row level security;
 
 
 -- =====================================================================

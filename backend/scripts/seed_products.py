@@ -132,8 +132,6 @@ def build_product(i: int) -> dict:
             "style_cluster": cluster_id,
             "style_name": cluster_name,
         },
-        # Filled in Phase 1 when we generate CLIP embeddings; null for now.
-        "pinecone_id": None,
         "embedding_model_version": None,
     }
 
