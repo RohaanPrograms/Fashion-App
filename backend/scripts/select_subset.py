@@ -16,25 +16,7 @@ import pandas as pd
 
 from ml.constants import CATEGORY_QUOTAS, HOLDOUT_DAYS, TRAINING_WINDOW_MONTHS
 from ml.selection import count_training_window_purchases, select_catalog_subset
-
-# article_id is 10 digits with a leading zero ("0108775015").
-ARTICLE_ID_WIDTH = 10
-
-
-def load_transactions(path: Path) -> pd.DataFrame:
-    """Read only the two columns needed from the 31M-row file, compactly.
-
-    Read as text, 31M article IDs take several GB of RAM. As integers they take
-    ~250 MB, and ~730 distinct dates fit in a categorical (stored once each).
-    """
-    transactions = pd.read_csv(
-        path,
-        usecols=["t_dat", "article_id"],
-        dtype={"t_dat": "category", "article_id": "int64"},
-    )
-    dates = transactions["t_dat"]
-    transactions["t_dat"] = pd.to_datetime(dates.cat.categories)[dates.cat.codes]
-    return transactions
+from scripts.hm_data import article_ids_to_str, load_transactions
 
 
 def main() -> None:
@@ -51,8 +33,7 @@ def main() -> None:
     counts = count_training_window_purchases(
         transactions, months=TRAINING_WINDOW_MONTHS, holdout_days=HOLDOUT_DAYS
     )
-    # Restore the leading zero lost by reading IDs as integers, to match articles.csv.
-    counts.index = counts.index.astype(str).str.zfill(ARTICLE_ID_WIDTH)
+    counts.index = article_ids_to_str(counts.index)
 
     subset = select_catalog_subset(articles, counts, CATEGORY_QUOTAS)
     args.out.parent.mkdir(parents=True, exist_ok=True)

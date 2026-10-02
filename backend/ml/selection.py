@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import pandas as pd
 
+from ml.split import split_by_date, trim_to_recent_months
+
 
 def count_training_window_purchases(
     transactions: pd.DataFrame,
@@ -22,14 +24,11 @@ def count_training_window_purchases(
 ) -> pd.Series:
     """Purchases per article within the training window, indexed by article_id.
 
-    The boundaries match ml/split.py: the window starts strictly after
-    `latest - months` and ends on `latest - holdout_days` inclusive.
+    Reuses ml/split.py so the window is cut exactly where training data is.
     """
-    latest = transactions[date_col].max()
-    start = latest - pd.DateOffset(months=months)
-    end = latest - pd.Timedelta(days=holdout_days)
-    in_window = (transactions[date_col] > start) & (transactions[date_col] <= end)
-    return transactions.loc[in_window, "article_id"].value_counts()
+    recent = trim_to_recent_months(transactions, months, date_col)
+    train, _holdout = split_by_date(recent, holdout_days, date_col)
+    return train["article_id"].value_counts()
 
 
 def select_catalog_subset(
