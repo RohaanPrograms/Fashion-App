@@ -1,0 +1,46 @@
+# Keeps the free-tier Supabase project from pausing.
+#
+# Supabase pauses free projects after about a week with no activity, which
+# takes the demo offline until someone clicks "Restore" in the dashboard. This
+# makes one tiny read against the database every day so it never goes idle.
+#
+# Needs two repository secrets (Settings -> Secrets and variables -> Actions):
+#   SUPABASE_URL       e.g. https://abcd1234.supabase.co
+#   SUPABASE_ANON_KEY  the public anon key, same value as in backend/.env
+#
+# GitHub disables scheduled workflows in a repo with no commits for 60 days;
+# re-enable it from the Actions tab if that happens.
+
+name: Keep Supabase awake
+
+on:
+  schedule:
+    - cron: "17 9 * * *"   # daily at 09:17 UTC
+  workflow_dispatch: {}     # "Run workflow" button, for testing
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read one product row
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::Set the SUPABASE_URL and SUPABASE_ANON_KEY repository secrets."
+            exit 1
+          fi
+          # --fail turns an HTTP error (e.g. a paused project) into a failed run,
+          # which GitHub emails about.
+          curl --fail --silent --show-error \
+            --retry 3 --retry-delay 10 --max-time 30 \
+            "${SUPABASE_URL%/}/rest/v1/products?select=id&limit=1" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            --output /dev/null
+          echo "Supabase responded."
