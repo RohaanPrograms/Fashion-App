@@ -8,3 +8,7 @@ python-dotenv==1.0.1
 # It already arrives as a dependency of supabase, but we import it directly, so
 # it is pinned here rather than left to chance if supabase ever drops it.
 PyJWT==2.13.0
+# Pinned below 4.15: from 4.15.0 anyio warns that starlette 0.41 (via fastapi
+# 0.115) uses a deprecated alias, and pytest.ini turns warnings into failures.
+# Lift this when fastapi is upgraded.
+anyio==4.14.2
