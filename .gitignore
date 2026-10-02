@@ -41,3 +41,9 @@ CLAUDE.md
 .claude/
 **/.claude/
 fashion-app-architecture.md
+docs/superpowers/
+
+# ---- H&M dataset (Phase 1) ----
+# Multiple GB, licensed for non-commercial research use, and reproducible
+# from scripts/ — it must never be committed.
+data/
