@@ -9,6 +9,7 @@ Supabase to fail — or succeed — installs a stand-in client, so the suite run
 identically on your laptop and in CI, with or without a network connection.
 """
 
+import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
@@ -204,3 +205,27 @@ def supabase_data(monkeypatch):
         return stub
 
     return _install
+
+
+@pytest.fixture
+def item_vectors() -> np.ndarray:
+    """Four items in 2-D, hand-placed so similarity results are obvious.
+
+    Items 0 and 1 point almost the same way ("casual"); items 2 and 3 point
+    almost the same way ("dressy"); the two groups are orthogonal.
+    """
+    return np.array(
+        [
+            [1.0, 0.0],   # 0 — casual
+            [0.9, 0.1],   # 1 — casual
+            [0.0, 1.0],   # 2 — dressy
+            [0.1, 0.9],   # 3 — dressy
+        ]
+    )
+
+
+@pytest.fixture
+def product_groups() -> list[str]:
+    """Colourway grouping for the four fixture items: 0 and 1 are the same
+    garment in two colours."""
+    return ["A", "A", "B", "C"]

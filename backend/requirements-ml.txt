@@ -1,0 +1,6 @@
+# Offline training only. NOT installed on the API server (see spec section 9).
+-r requirements.txt
+pandas==2.2.3
+scipy==1.15.1
+implicit==0.7.3
+Pillow==11.1.0

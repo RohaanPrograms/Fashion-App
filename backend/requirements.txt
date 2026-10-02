@@ -12,3 +12,4 @@ PyJWT==2.13.0
 # 0.115) uses a deprecated alias, and pytest.ini turns warnings into failures.
 # Lift this when fastapi is upgraded.
 anyio==4.14.2
+numpy==2.2.1
