@@ -6,7 +6,6 @@ pick old best-sellers with no recent purchases, which would get no vector.
 
 Popularity alone would also hand us thousands of tops and almost no shoes, so
 each category gets its own quota, filled by popularity within that category.
-See spec section 4, Stage 1.
 """
 
 from __future__ import annotations

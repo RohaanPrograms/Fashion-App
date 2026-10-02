@@ -1,4 +1,4 @@
-# Offline training only. NOT installed on the API server (see spec section 9).
+# Offline training only. NOT installed on the API server.
 -r requirements.txt
 pandas==2.2.3
 scipy==1.15.1

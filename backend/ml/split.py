@@ -3,7 +3,7 @@
 A random split would put a customer's later purchase in training and an
 earlier one in the test set: the model would have seen the future and every
 metric would be inflated. Splitting on a date mirrors reality — you only ever
-know the past. See spec section 4, Stage 2.
+know the past.
 """
 
 from __future__ import annotations
