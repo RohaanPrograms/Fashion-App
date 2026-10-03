@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     # itself instead of asking Supabase to check every request. Unused until
     # that change lands; blank keeps the current behaviour.
     SUPABASE_JWT_SECRET: str = ""
+    # Public Storage bucket holding the resized product photos.
+    PRODUCT_IMAGE_BUCKET: str = ""
 
     # Later phases — present so the app boots even when unset.
     PINECONE_API_KEY: str = ""

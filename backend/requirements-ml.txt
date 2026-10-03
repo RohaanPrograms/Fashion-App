@@ -5,3 +5,4 @@ scipy==1.15.1
 implicit==0.7.3
 Pillow==11.1.0
 pyarrow==19.0.0
+kaggle==2.2.4

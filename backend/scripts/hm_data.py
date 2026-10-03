@@ -15,6 +15,13 @@ import pandas as pd
 # article_id is 10 digits with a leading zero ("0108775015").
 ARTICLE_ID_WIDTH = 10
 
+KAGGLE_COMPETITION = "h-and-m-personalized-fashion-recommendations"
+
+
+def kaggle_image_name(article_id: str) -> str:
+    """H&M nests photos by the first three digits: images/063/0636455003.jpg"""
+    return f"images/{article_id[:3]}/{article_id}.jpg"
+
 
 def load_transactions(path: Path, with_customers: bool = False) -> pd.DataFrame:
     """Read t_dat (as dates) and article_id (as int64), plus customer_id if asked."""

@@ -1,10 +1,13 @@
 """Stage 1 CLI — write the chosen catalog articles to disk.
 
     cd backend
-    python -m scripts.select_subset --data-dir ../data/hm --out ../data/subset.csv
+    python -m scripts.select_subset --data-dir ../data/hm \
+        --image-ids ../data/image_ids.txt --out ../data/subset.csv
 
 Every later stage reads this file, so the whole pipeline operates on an
-identical set of articles even if it is re-run days apart.
+identical set of articles even if it is re-run days apart. Articles without a
+product photo (see scripts/list_image_ids.py) are never selected: the feed has
+nothing to show for them.
 """
 
 from __future__ import annotations
@@ -22,12 +25,17 @@ from scripts.hm_data import article_ids_to_str, load_transactions
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", required=True, type=Path)
+    parser.add_argument("--image-ids", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args()
 
     articles = pd.read_csv(
         args.data_dir / "articles.csv", dtype={"article_id": str, "product_code": str}
     )
+    with_photo = set(args.image_ids.read_text(encoding="utf-8").split())
+    no_photo = ~articles["article_id"].isin(with_photo)
+    print(f"Skipping {no_photo.sum():,} of {len(articles):,} articles with no photo")
+    articles = articles[~no_photo]
     transactions = load_transactions(args.data_dir / "transactions_train.csv")
 
     counts = count_training_window_purchases(
