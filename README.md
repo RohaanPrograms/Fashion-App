@@ -2,15 +2,15 @@
 
 # Fashion App
 
-**A mobile-first fashion discovery app that learns your style as you swipe.**
+**A fashion discovery app that learns your style as you swipe — powered by a recommender trained on 31 million real purchases.**
 
-Swipe a feed that adapts to your taste · Point your camera at any outfit to find it · Filter everything by your budget
+Swipe a feed that adapts to your taste · See *why* each item was picked · Collect what you like and build outfits from it
 
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20Auth-3FCF8E?logo=supabase&logoColor=white)](https://supabase.com/)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20Auth%20%2B%20Storage-3FCF8E?logo=supabase&logoColor=white)](https://supabase.com/)
 [![React Native](https://img.shields.io/badge/React%20Native-Expo-61DAFB?logo=react&logoColor=black)](https://expo.dev/)
-[![Status](https://img.shields.io/badge/status-Phase%200%20·%20Foundation-orange)](#roadmap)
+[![Status](https://img.shields.io/badge/status-Phase%201%20·%20Data%20and%20model-orange)](#roadmap)
 
 </div>
 
@@ -20,69 +20,86 @@ Swipe a feed that adapts to your taste · Point your camera at any outfit to fin
 
 | | Feature | How it works |
 |---|---|---|
-| 🔥 | **Discovery feed** | Swipe to like, dislike, save, or cart. Dwell time is tracked as an implicit signal. |
-| 🧠 | **Learns your style** | Interactions build a style vector — no questionnaire, no manual tagging. |
-| 📸 | **Visual search** | Upload a photo or screenshot; the app identifies the garment. |
-| 🔎 | **Finds alternatives** | Matches across big brands, small stores, and indie designers. |
-| 💸 | **Budget filtering** | Every surface respects the price range you set. |
-| 🔗 | **Tap to buy** | Links straight to the retailer via affiliate links. |
-| ✨ | **Virtual try-on** | *Planned.* AI try-on from a single photo. |
+| 🔥 | **Discovery feed** | One card at a time: like or dislike. Every swipe is the only taste signal the system needs — no questionnaire. |
+| 🧠 | **Learns your style** | Each garment has 64 learned numbers. Your taste is the average of the ones you like; the feed ranks the catalog by similarity to it. |
+| 💡 | **Explains itself** | Every card can show *why* it was surfaced — "because you liked the black hoodie". |
+| 👗 | **Wardrobe** | Everything you liked, in one grid. |
+| 🧩 | **Outfit sets** | Build 2–5 piece outfits from your wardrobe, one per slot, with a total price. |
+
+*Status: the data pipeline is built; the model, API and app screens are in progress — see the [roadmap](#roadmap).*
+
+## How the recommender works
+
+1. **Data.** The [H&M Personalized Fashion Recommendations](https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations) research dataset: ~105k garments and ~31.8M purchases over two years.
+2. **Catalog.** 5,000 garments, chosen by per-category quotas (tops, bottoms, dresses, shoes, accessories) and filled with the best-sellers *within the training window* — so every item has enough purchase history to learn from. Articles without a product photo are skipped.
+3. **Temporal split.** The model learns from six months of purchases ending 2020-09-08 and is tested on the following two weeks, which it never sees. Splitting by date rather than at random is what stops the evaluation from "seeing the future".
+4. **Model.** ALS (alternating least squares) matrix factorisation via the `implicit` library learns 64 latent factors per garment from who bought what. *(In progress.)*
+5. **Evaluation.** Simulates a new visitor: three of a real customer's purchases are fed in as likes, and the model must predict the rest of their basket. Scored as recall@12 and MAP@12 against a best-sellers baseline and a random baseline. *(In progress — results will be reported here, whichever way they go.)*
+
+No model runs at request time: vectors are trained offline once, and the API only does arithmetic on the saved numbers (5,000 × 64 floats ≈ 1.3 MB, held in memory).
 
 ## Architecture
 
 ```
+OFFLINE — runs once on a laptop
 ┌──────────────────────────────────────────────────────────┐
-│              Mobile App (React Native + Expo)            │
-│    Discovery Feed  ·  Visual Search  ·  Wishlist/Cart    │
-└─────────────────────────┬────────────────────────────────┘
-                          │ HTTPS / REST
-┌─────────────────────────▼────────────────────────────────┐
-│                 API Layer (Python · FastAPI)             │
-│      /feed   /search   /auth   /catalog   /interactions  │
-└───┬──────────────┬──────────────┬───────────┬────────────┘
-    │              │              │           │
-┌───▼───┐   ┌──────▼─────┐  ┌─────▼────┐  ┌───▼───────┐
-│ Auth  │   │ ML Service │  │ Catalog  │  │ Commerce  │
-└───┬───┘   └──────┬─────┘  └─────┬────┘  └───┬───────┘
-    │              │              │           │
-┌───▼──────────────▼──────────────▼───────────▼───────────┐
-│                       Data Layer                        │
-│  Supabase (Postgres · Auth · Storage)                   │
-│  Pinecone (vector embeddings)  ·  Upstash Redis (cache) │
-└─────────────────────────────────────────────────────────┘
+│  H&M dataset  →  select 5,000  →  split by time          │
+│              →  train ALS (64 numbers per garment)        │
+│              →  evaluate vs best-sellers + random         │
+└───────────────┬──────────────────────────────────────────┘
+                │ vectors, catalog, photos
+LIVE            ▼
+┌──────────────────────────────────────────────────────────┐
+│       Web app (React Native + Expo, exported to web)      │
+│          Feed  ·  Wardrobe  ·  Outfit sets                │
+└──────────────────────────┬───────────────────────────────┘
+                           │ HTTPS / REST
+┌──────────────────────────▼───────────────────────────────┐
+│                API (Python · FastAPI)                     │
+│   /feed  /interactions  /wardrobe  /outfits  /auth        │
+│   Item vectors in memory · style vector rebuilt per call  │
+└──────────────────────────┬───────────────────────────────┘
+                           │
+┌──────────────────────────▼───────────────────────────────┐
+│   Supabase: Postgres (products, vectors, interactions,    │
+│   outfits) · Auth incl. guest sessions · Storage (photos) │
+└──────────────────────────────────────────────────────────┘
 ```
 
-Stack decisions, the data model, the ML pipeline, and phasing are tracked separately in the project's internal design notes.
+No vector database and no cache: at 5,000 items the whole catalog's vectors fit in memory and rank in under a millisecond.
 
 ## Tech stack
 
 | Layer | Choice | Why |
 |---|---|---|
-| Mobile | React Native + Expo, TypeScript, Zustand, NativeWind | One codebase for iOS and Android, minimal native build complexity. |
-| API | Python, FastAPI | Async, self-documenting, and in the same language as the ML stack. |
-| Auth | Supabase Auth (JWT) | Email plus Google/Apple OAuth without building auth from scratch. |
-| Database | Supabase (PostgreSQL) | Users, interactions, catalog metadata, wishlist, cart. |
-| Vectors | Pinecone | Style vectors and product embeddings for similarity search. |
-| Cache | Upstash Redis | Per-user style vectors, feed results, session state. |
-| ML | Replicate (CLIP ViT-L/14), HuggingFace Inference | Hosted inference for the MVP; self-hosted later. |
+| App | React Native + Expo, TypeScript, Expo Router | One codebase; exported to the web so anyone can try it from a link. |
+| API | Python, FastAPI | Async, self-documenting, same language as the ML code. |
+| Auth | Supabase Auth (JWT) | Email sign-in now, guest sessions planned so there's no signup wall. Tokens are verified locally when the JWT secret is configured, otherwise by Supabase. |
+| Database | Supabase (PostgreSQL) | Products, item vectors, interactions, outfits — with Row Level Security. |
+| Photos | Supabase Storage | 5,000 product photos as 400px WebP (~10 KB each). |
+| ML | `implicit` (ALS), numpy, pandas, scipy | Trained offline on a CPU in minutes; no inference service needed. |
+| CI | GitHub Actions | Type-checks the app and runs the backend test suite on every push; a daily job keeps the free-tier database awake. |
 
 ## Repo layout
 
 ```
-backend/                     FastAPI backend — auth, feed, search, catalog APIs
-  app/
-    main.py                  App entrypoint, middleware, router wiring
+backend/
+  app/                       FastAPI app
+    main.py                  Entrypoint, middleware, router wiring
     core/config.py           Env-backed settings (single source of env access)
-    core/supabase_client.py  Supabase client
-    api/deps.py              Shared dependencies (current-user resolver)
+    core/security.py         Access-token verification (local when configured)
+    core/errors.py           Distinguishes outages from bad credentials
     api/v1/auth.py           Auth routes
-    schemas/auth.py          Request/response models
-  supabase/schema.sql        Tables, indexes, RLS policies, storage bucket
+  ml/                        Pure, tested ML logic — no I/O
+    constants.py             Shared tunables (one copy, used by evaluation and API)
+    selection.py             Catalog selection by category quota
+    split.py                 Temporal train/holdout split
+    images.py                Photo resizing to WebP
+  scripts/                   Thin command-line wrappers that run the pipeline
+  tests/                     pytest suite (warnings are treated as errors)
+  supabase/schema.sql        Tables, indexes, RLS policies — re-runnable
 mobile/                      React Native + Expo app (Expo Router)
-  app/                       Screens — index, login, signup, home
-  src/api/client.ts          fetch() wrapper for the backend
-  src/auth/AuthContext.tsx   Session state + automatic token refresh
-  src/config.ts              Per-environment API base URL
+landing/                     Static landing page (GitHub Pages)
 ```
 
 ## Quick start
@@ -95,10 +112,11 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1        # Windows (PowerShell)
 # source .venv/bin/activate       # macOS / Linux
 
-pip install -r requirements.txt
-cp .env.example .env              # then fill in your Supabase keys
+pip install -r requirements-dev.txt   # server + ML + test dependencies
+cp .env.example .env                  # then fill in your Supabase keys
 
-uvicorn app.main:app --reload
+python -m pytest -q                   # run the test suite
+uvicorn app.main:app --reload         # start the API
 ```
 
 | | |
@@ -107,45 +125,44 @@ uvicorn app.main:app --reload
 | Interactive docs | http://localhost:8000/docs |
 | Health check | http://localhost:8000/health |
 
-The app boots without Supabase credentials. Auth endpoints return `503` until `SUPABASE_URL` and `SUPABASE_ANON_KEY` are set in `.env`.
-
-More detail in [`backend/README.md`](./backend/README.md).
+The server itself only needs `requirements.txt`; `requirements-ml.txt` adds the offline training libraries, and `requirements-dev.txt` adds pytest on top. More detail, including the data pipeline commands, in [`backend/README.md`](./backend/README.md).
 
 ## API (v1)
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| `GET` | `/health` | — | Liveness and config check |
+| `GET` | `/health` | — | Liveness, config and database check |
 | `POST` | `/v1/auth/signup` | — | Create account |
 | `POST` | `/v1/auth/login` | — | Email/password login |
 | `POST` | `/v1/auth/refresh` | — | Swap a refresh token for a fresh access token |
 | `GET` | `/v1/auth/me` | Bearer token | Current authenticated user |
 
-Access tokens expire after an hour; the app refreshes them in the background so a signed-in user stays signed in.
+Planned: `GET /v1/feed`, `POST /v1/interactions`, `GET /v1/wardrobe`, `GET/POST/DELETE /v1/outfits`.
 
 ## Roadmap
 
-**Phase 0 — Foundation** (weeks 1–2) ← we are here
+**Phase 0 — Foundation** ✅ — FastAPI + Supabase auth, Expo app with token refresh, database schema with RLS, CI, dev/staging/prod config.
 
-- [x] Repo structure and environment config
-- [x] FastAPI skeleton with `/auth` endpoints
-- [x] React Native + Expo app: signup, login, navigation, token refresh
-- [x] Supabase project: auth
-- [x] Supabase project: database schema + storage bucket
-- [x] GitHub Actions CI pipeline
+**Phase 1 — Data and model** ← in progress
 
-Phase 0 is complete. The database structure lives in
-[`backend/supabase/schema.sql`](./backend/supabase/schema.sql) — re-runnable,
-so it can rebuild the database from scratch or set up a staging copy.
+- [x] Acquire the H&M dataset
+- [x] Select the 5,000-item catalog (training-window popularity, per-category quotas, photo required)
+- [x] Temporal train/holdout split — 4.05M training purchases, 12,103 evaluable test customers
+- [x] Schema: `popularity`, `product_code`, `product_vectors`
+- [x] Product photos resized to WebP and uploaded to Storage
+- [ ] Load the catalog into Postgres
+- [ ] Interaction matrix, ranking functions, metrics
+- [ ] Train ALS and evaluate against best-sellers and random baselines
 
-| Phase | | Highlights |
-|---|---|---|
-| 1 | **Discovery Feed + Onboarding** <sub>weeks 3–5</sub> | First 500 products ingested, CLIP embeddings into Pinecone, swipe card UI, interaction + dwell-time tracking |
-| 2 | **Visual Search** <sub>weeks 6–8</sub> | Image upload, `POST /v1/search/image`, Pinecone similarity, budget filter, second catalog source |
-| 3 | **Personalisation** <sub>weeks 9–12</sub> | Style vectors from interaction history, cosine-similarity feed, "because you liked X" |
-| 4 | **Scale Intelligence** <sub>post-MVP</sub> | Contextual bandit, HDBSCAN trend clustering, fine-tuned vision model, filter-bubble mitigation |
-| 5 | **Virtual Try-On** <sub>v2</sub> | IDM-VTON via Replicate, private photo storage, save and share results |
-| 6 | **Commerce Expansion** <sub>later</sub> | Google/Apple sign-in, in-app Stripe checkout, wishlist price-drop alerts |
+**Phase 2 — Backend:** feed, interactions, wardrobe and outfit endpoints; guest sessions; deploy.
+**Phase 3 — App and front door:** feed / wardrobe / sets screens, "why am I seeing this?", web deploy, results in this README.
+**Phase 4 — Polish:** visual pass and a demo recording.
+
+**Designed, deliberately not built:** visual search, virtual try-on, affiliate checkout, contextual bandits, trend clustering — each cut for scope, not feasibility.
+
+## Data and licensing
+
+The H&M dataset is licensed for non-commercial research use. This project is a demo, not a store: nothing is sold, prices shown are synthetic, and the dataset itself is never committed to this repository.
 
 ---
 
