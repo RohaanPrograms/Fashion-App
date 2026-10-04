@@ -150,7 +150,7 @@ Planned: `GET /v1/feed`, `POST /v1/interactions`, `GET /v1/wardrobe`, `GET/POST/
 - [x] Temporal train/holdout split — 4.05M training purchases, 12,103 evaluable test customers
 - [x] Schema: `popularity`, `product_code`, `product_vectors`
 - [x] Product photos resized to WebP and uploaded to Storage
-- [ ] Load the catalog into Postgres
+- [x] Load the catalog into Postgres — 5,000 products with photos and synthetic prices
 - [ ] Interaction matrix, ranking functions, metrics
 - [ ] Train ALS and evaluate against best-sellers and random baselines
 
