@@ -138,9 +138,6 @@ create table if not exists public.products (
   price numeric(10, 2) check (price >= 0),
   currency text not null default 'GBP',
 
-  -- Link to the retailer's image. We deliberately do not copy product
-  -- images into our own storage: it would burn the free tier and add
-  -- bandwidth cost for no benefit.
   image_url text,
 
   -- Flagged rather than deleted when out of stock, so trend analysis keeps
