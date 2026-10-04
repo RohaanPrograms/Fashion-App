@@ -3,6 +3,7 @@
 pandas==2.2.3
 scipy==1.15.1
 implicit==0.7.3
+threadpoolctl==3.7.0
 Pillow==11.1.0
 pyarrow==19.0.0
 kaggle==2.2.4
