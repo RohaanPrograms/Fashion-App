@@ -1,8 +1,16 @@
 import numpy as np
 import pandas as pd
+import pytest
+from scipy.sparse import csr_matrix
 
 from ml.matrix import build_interaction_matrix
-from ml.train import build_vector_rows, fetch_all_pages, model_version, train_als
+from ml.train import (
+    build_vector_rows,
+    fetch_all_pages,
+    model_version,
+    scale_counts,
+    train_als,
+)
 
 
 def _clustered_transactions() -> pd.DataFrame:
@@ -57,6 +65,50 @@ def test_same_seed_gives_identical_vectors():
 
 def test_model_version_encodes_the_factor_count():
     assert model_version(64) == "als-64f-v1"
+
+
+def test_model_version_marks_log_scaled_counts():
+    """Raw keeps the existing label, so vectors already stored stay correct."""
+    assert model_version(64, "raw") == "als-64f-v1"
+    assert model_version(64, "log") == "als-64f-log-v1"
+
+
+def _counts() -> csr_matrix:
+    return csr_matrix(np.array([[1.0, 80.0], [0.0, 2.0]], dtype=np.float32))
+
+
+def test_log_scaling_keeps_single_purchases_and_shrinks_repeats():
+    scaled = scale_counts(_counts(), "log")
+
+    assert scaled[0, 0] == pytest.approx(1.0)
+    assert scaled[0, 1] == pytest.approx(1 + np.log(80))  # ~5.38, not 80
+    assert scaled[1, 1] == pytest.approx(1 + np.log(2))
+    assert scaled.nnz == 3  # blanks stay blank
+
+
+def test_raw_scaling_leaves_counts_unchanged():
+    assert (scale_counts(_counts(), "raw") != _counts()).nnz == 0
+
+
+def test_scaling_does_not_modify_the_input():
+    counts = _counts()
+
+    scale_counts(counts, "log")
+
+    assert counts[0, 1] == 80.0
+
+
+def test_unknown_scaling_is_rejected():
+    with pytest.raises(ValueError):
+        scale_counts(_counts(), "sqrt")
+
+
+def test_trains_with_log_scaled_counts():
+    matrix, mapping = build_interaction_matrix(_clustered_transactions())
+
+    vectors = train_als(matrix, factors=8, iterations=5, scaling="log")
+
+    assert vectors.shape == (len(mapping.article_ids), 8)
 
 
 def test_vector_rows_attach_each_vector_to_its_own_product():

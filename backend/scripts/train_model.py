@@ -1,7 +1,7 @@
 """Train ALS and write the item vectors into product_vectors.
 
     cd backend
-    python -m scripts.train_model --train ../data/train.parquet --factors 64
+    python -m scripts.train_model --train ../data/train.parquet --factors 64 [--scaling log]
 
 Safe to re-run. product_id is the table's primary key, so each garment holds
 exactly one vector: new vectors are upserted over the old ones first, and only
@@ -20,7 +20,13 @@ import pandas as pd
 from app.core.supabase_client import get_service_client
 from ml.catalog import SOURCE
 from ml.matrix import build_interaction_matrix
-from ml.train import build_vector_rows, fetch_all_pages, model_version, train_als
+from ml.train import (
+    COUNT_SCALINGS,
+    build_vector_rows,
+    fetch_all_pages,
+    model_version,
+    train_als,
+)
 
 BATCH_SIZE = 500
 
@@ -29,6 +35,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--train", required=True, type=Path)
     parser.add_argument("--factors", type=int, default=64)
+    parser.add_argument("--scaling", choices=COUNT_SCALINGS, default="raw")
     args = parser.parse_args()
 
     transactions = pd.read_parquet(args.train)
@@ -36,8 +43,8 @@ def main() -> None:
     print(f"matrix: {matrix.shape[0]:,} customers x {matrix.shape[1]:,} articles")
 
     started = time.perf_counter()
-    vectors = train_als(matrix, factors=args.factors)
-    version = model_version(args.factors)
+    vectors = train_als(matrix, factors=args.factors, scaling=args.scaling)
+    version = model_version(args.factors, args.scaling)
     print(f"trained {vectors.shape} as {version} in {time.perf_counter() - started:.1f}s")
 
     client = get_service_client()

@@ -8,10 +8,11 @@ almost always means "never saw it" — nobody browses 105,000 garments — not
 (1 if bought, 0 otherwise) from a *confidence* in that preference, scaled by
 `alpha`. Blanks become zeros held weakly rather than rejections.
 
-Purchase counts are used raw, so one customer buying an item 80 times gives
-that cell a confidence of 1 + 40 x 80. Whether that lets a few bulk buyers
-skew the vectors is checked in the cold-start evaluation before anything is
-done about it.
+Raw purchase counts let one customer buying an item 80 times give that cell a
+confidence of 1 + 40 x 80, against 41 for a single purchase. "log" scaling
+turns each count into 1 + ln(count) first — 1 stays 1, 80 becomes ~5.4 — so a
+repeat buy still counts for more without a few bulk buyers dominating. The
+cold-start evaluation trains both ways and the better one ships.
 """
 
 from __future__ import annotations
@@ -27,15 +28,33 @@ from ml.constants import RANDOM_SEED
 
 MODEL_FAMILY = "als"
 MODEL_REVISION = "v1"
+COUNT_SCALINGS = ("raw", "log")
 
 
-def model_version(factors: int) -> str:
+def model_version(factors: int, scaling: str = "raw") -> str:
     """Identifier stored on every vector row.
 
     Vectors from different runs are not comparable; mixing them returns
     nonsense rather than an error, so every row records where it came from.
+    Raw counts keep the original label, so vectors already stored stay correct.
     """
-    return f"{MODEL_FAMILY}-{factors}f-{MODEL_REVISION}"
+    variant = "" if scaling == "raw" else f"-{scaling}"
+    return f"{MODEL_FAMILY}-{factors}f{variant}-{MODEL_REVISION}"
+
+
+def scale_counts(matrix: csr_matrix, scaling: str) -> csr_matrix:
+    """Return the purchase counts as ALS should see them. Never edits the input.
+
+    Only stored cells are touched: a blank stays blank, and every stored count
+    is at least 1, so 1 + ln(count) is never below 1.
+    """
+    if scaling == "raw":
+        return matrix
+    if scaling == "log":
+        scaled = matrix.copy()
+        scaled.data = 1.0 + np.log(scaled.data)
+        return scaled
+    raise ValueError(f"scaling must be one of {COUNT_SCALINGS}, got {scaling!r}")
 
 
 def train_als(
@@ -45,6 +64,7 @@ def train_als(
     iterations: int = 15,
     alpha: float = 40.0,
     seed: int = RANDOM_SEED,
+    scaling: str = "raw",
 ) -> np.ndarray:
     """Train ALS and return the item factors.
 
@@ -55,11 +75,13 @@ def train_als(
         iterations: how many times to alternate between solving for users and items.
         alpha: how strongly a purchase counts as confident evidence.
         seed: fixed for reproducibility.
+        scaling: "raw" counts, or "log" to shrink repeat purchases (see above).
 
     Returns:
         Item factors, shape (n_articles, factors). The user factors are
         discarded — the app has no H&M customers, so it never uses them.
     """
+    matrix = scale_counts(matrix, scaling)
     # implicit already trains in parallel; letting the maths library underneath
     # (OpenBLAS) start its own threads as well makes them fight over the CPU,
     # which implicit warns can be ~10x slower. One BLAS thread, as it advises.
