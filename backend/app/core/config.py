@@ -47,9 +47,10 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = ""
     SUPABASE_ANON_KEY: str = ""
     SUPABASE_SERVICE_ROLE_KEY: str = ""
-    # Signs and verifies access tokens. With it set, the API can check a token
-    # itself instead of asking Supabase to check every request. Unused until
-    # that change lands; blank keeps the current behaviour.
+    # Signs and verifies access tokens. With it set (and confirmed against the
+    # anon key at startup), the API checks tokens itself instead of asking
+    # Supabase on every request — see app/core/security.py. Blank falls back
+    # to asking Supabase.
     SUPABASE_JWT_SECRET: str = ""
     # Public Storage bucket holding the resized product photos.
     PRODUCT_IMAGE_BUCKET: str = ""
