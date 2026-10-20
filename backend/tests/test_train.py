@@ -6,7 +6,6 @@ from scipy.sparse import csr_matrix
 from ml.matrix import build_interaction_matrix
 from ml.train import (
     build_vector_rows,
-    fetch_all_pages,
     model_version,
     scale_counts,
     train_als,
@@ -145,26 +144,3 @@ def test_vector_rows_hold_plain_floats_for_json():
     rows, _ = build_vector_rows(vectors, ["a1"], {"a1": "uuid-1"}, "v")
 
     assert type(rows[0]["vector"][0]) is float
-
-
-def test_fetch_all_pages_collects_past_the_first_page():
-    """Supabase returns at most 1,000 rows per request; one request is not enough."""
-    data = list(range(2345))
-    calls = []
-
-    def fetch_page(start: int, end: int) -> list[int]:
-        calls.append((start, end))
-        return data[start : end + 1]  # end is inclusive, as in Supabase's range()
-
-    result = fetch_all_pages(fetch_page, page_size=1000)
-
-    assert result == data
-    assert calls == [(0, 999), (1000, 1999), (2000, 2999)]
-
-
-def test_fetch_all_pages_stops_after_an_exactly_full_last_page():
-    data = list(range(2000))
-
-    result = fetch_all_pages(lambda s, e: data[s : e + 1], page_size=1000)
-
-    assert result == data

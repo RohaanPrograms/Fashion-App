@@ -229,3 +229,146 @@ def product_groups() -> list[str]:
     """Colourway grouping for the four fixture items: 0 and 1 are the same
     garment in two colours."""
     return ["A", "A", "B", "C"]
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: a fake Supabase client that records queries, and test catalogues.
+# ---------------------------------------------------------------------------
+
+from types import SimpleNamespace
+
+
+class _RecordingQuery:
+    """One query chain, e.g. client.table("x").select(...).eq(...).range(...)."""
+
+    def __init__(self, client: "RecordingClient", table: str):
+        self._client = client
+        self.table = table
+        self.calls: list[tuple[str, tuple, dict]] = []
+
+    def __getattr__(self, method):
+        # Any builder method (select, eq, order, range, insert, delete, ...) is
+        # recorded and returns the same query, so chains of any shape work.
+        def record(*args, **kwargs):
+            self.calls.append((method, args, kwargs))
+            return self
+
+        return record
+
+    def called(self, method: str) -> list[tuple]:
+        return [args for name, args, _ in self.calls if name == method]
+
+    def execute(self):
+        inserted = self.called("insert")
+        if inserted:
+            payload = inserted[-1][0]
+            rows = payload if isinstance(payload, list) else [payload]
+            rows = [{"id": "fake-id", **row} for row in rows]
+            return SimpleNamespace(data=rows, count=len(rows))
+        rows = list(self._client.tables.get(self.table, []))
+        ranges = self.called("range")
+        if ranges:
+            start, end = ranges[-1]
+            rows = rows[start : end + 1]
+        return SimpleNamespace(data=rows, count=len(rows))
+
+
+class RecordingClient:
+    """Fake Supabase client: serves canned rows and records every query.
+
+    `tables` maps a table name to the rows a select returns. Filters are NOT
+    applied — tests assert on the recorded calls instead, e.g. that a user
+    filter was present. `queries` lists every query in order.
+    """
+
+    def __init__(self, tables: dict | None = None):
+        self.tables = tables or {}
+        self.queries: list[_RecordingQuery] = []
+
+    def table(self, name: str) -> _RecordingQuery:
+        query = _RecordingQuery(self, name)
+        self.queries.append(query)
+        return query
+
+
+def _uuid(n: int) -> str:
+    return f"00000000-0000-4000-8000-{n:012d}"
+
+
+# name -> (category, product_code, popularity, price, vector)
+_SMALL = {
+    "black_tee":   ("Garment Upper body", "T1", 900, 10.0, [1.0, 0.0]),
+    "white_tee":   ("Garment Upper body", "T1", 800, 10.0, [0.98, 0.05]),
+    "striped_tee": ("Garment Upper body", "T2", 100, 12.0, [0.9, 0.2]),
+    "jeans":       ("Garment Lower body", "B1", 700, 30.0, [0.8, 0.3]),
+    "dress":       ("Garment Full body",  "D1", 600, 50.0, [0.0, 1.0]),
+    "heels":       ("Shoes",              "S1", 500, 40.0, [0.1, 0.95]),
+    "sneakers":    ("Shoes",              "S2", 400, 35.0, [0.7, 0.1]),
+    "belt":        ("Accessories",        "A1", 300, 8.0,  [0.5, 0.5]),
+}
+
+
+@pytest.fixture
+def ids() -> dict[str, str]:
+    """Product UUIDs of the small catalogue, by readable name."""
+    return {name: _uuid(i + 1) for i, name in enumerate(_SMALL)}
+
+
+def product_row(product_id, name, category, code, popularity, price):
+    return {
+        "id": product_id, "name": name, "brand": "H&M", "price": price,
+        "currency": "GBP", "image_url": f"https://img.example/{product_id}.webp",
+        "category": category, "product_code": code, "popularity": popularity,
+        "attributes": {"colour": "Black"},
+    }
+
+
+@pytest.fixture
+def small_catalog(ids):
+    """Eight garments in 2-D, hand-placed so rankings can be worked out by hand.
+
+    black_tee and white_tee are one design (T1) in two colours. The tees,
+    jeans and sneakers point "casual" (x); the dress and heels point "dressy" (y).
+    """
+    from app.recs.catalog import build_catalog
+
+    products, vectors = [], []
+    for name, (category, code, popularity, price, vector) in _SMALL.items():
+        products.append(product_row(ids[name], name, category, code, popularity, price))
+        vectors.append({"product_id": ids[name], "vector": vector, "model_version": "als-2f-v1"})
+    return build_catalog(products, vectors)
+
+
+@pytest.fixture
+def make_catalog():
+    """Factory for a larger random catalogue: make_catalog(n, seed=0)."""
+    from app.recs.catalog import build_catalog
+
+    def _make(n: int, seed: int = 0):
+        rng = np.random.default_rng(seed)
+        products, vectors = [], []
+        for i in range(n):
+            pid = _uuid(1000 + i)
+            products.append(product_row(pid, f"item{i}", "Garment Upper body", f"C{i}", n - i, 10.0))
+            vectors.append({"product_id": pid, "vector": rng.normal(size=8).tolist(), "model_version": "v"})
+        return build_catalog(products, vectors)
+
+    return _make
+
+
+@pytest.fixture(autouse=True)
+def no_catalog_by_default(monkeypatch):
+    """No test ever downloads the real catalogue.
+
+    Tests that need one install it with catalog_state.set(...); the loader is
+    replaced so an accidental load fails loudly instead of calling Supabase.
+    """
+    from app.recs.catalog import catalog_state
+
+    def _refuse():
+        raise RuntimeError("tests never load the real catalogue")
+
+    monkeypatch.setattr(catalog_state, "_loader", _refuse)
+    catalog_state.set(None)
+    yield
+    catalog_state.set(None)

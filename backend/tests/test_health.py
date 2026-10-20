@@ -36,13 +36,32 @@ def test_readiness_reports_503_when_supabase_is_unreachable(client, supabase_dat
     assert response.json()["detail"]["supabase_reachable"] is False
 
 
-def test_readiness_reports_200_when_supabase_answers(client, supabase_data):
+def test_readiness_reports_200_when_supabase_answers_and_the_catalogue_is_loaded(
+    client, supabase_data, small_catalog
+):
+    from app.recs.catalog import catalog_state
+
     supabase_data(None)  # healthy round trip
+    catalog_state.set(small_catalog)
 
     response = client.get("/health/ready")
 
     assert response.status_code == 200
-    assert response.json()["supabase_reachable"] is True
+    body = response.json()
+    assert body["supabase_reachable"] is True
+    assert body["catalog_loaded"] is True
+    assert body["products"] == 8
+    assert body["model_version"] == "als-2f-v1"
+
+
+def test_readiness_reports_503_when_the_catalogue_is_not_loaded(client, supabase_data):
+    """Reachable Supabase is not enough: without the catalogue the feed cannot serve."""
+    supabase_data(None)
+
+    response = client.get("/health/ready")
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["catalog_loaded"] is False
 
 
 def test_health_does_not_claim_reachability_it_has_not_checked(client, failing_supabase):

@@ -20,10 +20,10 @@ import pandas as pd
 from app.core.supabase_client import get_service_client
 from ml.catalog import SOURCE
 from ml.matrix import build_interaction_matrix
+from ml.paging import fetch_all_pages
 from ml.train import (
     COUNT_SCALINGS,
     build_vector_rows,
-    fetch_all_pages,
     model_version,
     train_als,
 )

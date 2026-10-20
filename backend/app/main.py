@@ -7,20 +7,37 @@ Run locally:
 Interactive docs at http://localhost:8000/docs
 """
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.concurrency import run_in_threadpool
 
 from app.api.v1 import auth
 from app.core.config import get_settings
 from app.core.errors import log_upstream_failure
 from app.core.supabase_client import get_service_client
+from app.recs.catalog import catalog_state
 
 settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Load the catalogue once at boot, so the first visitor does not wait.
+
+    A failure is logged inside get() and retried on demand; the server still
+    starts, and /health/ready reports the catalogue as not loaded.
+    """
+    await run_in_threadpool(catalog_state.get)
+    yield
+
 
 app = FastAPI(
     title="Fashion App API",
     version="0.1.0",
-    description="Backend for the fashion discovery app (Phase 0 skeleton).",
+    description="Backend for the fashion discovery app.",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -70,4 +87,17 @@ def readiness() -> dict:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={"status": "degraded", "supabase_reachable": False},
         ) from exc
-    return {"status": "ok", "supabase_reachable": True}
+
+    catalog = catalog_state.get()
+    if catalog is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"status": "degraded", "supabase_reachable": True, "catalog_loaded": False},
+        )
+    return {
+        "status": "ok",
+        "supabase_reachable": True,
+        "catalog_loaded": True,
+        "products": len(catalog),
+        "model_version": catalog.model_version,
+    }

@@ -9,6 +9,7 @@ from app.core.config import get_settings  # noqa: F401 — patched in tests
 from app.core.errors import is_infrastructure_error, log_upstream_failure
 from app.core.security import decode_access_token, uses_local_verification
 from app.core.supabase_client import get_anon_client
+from app.recs.catalog import Catalog, catalog_state
 from app.schemas.auth import UserOut
 
 _bearer = HTTPBearer(auto_error=True)
@@ -69,3 +70,14 @@ def get_current_user(
             detail="Invalid or expired token",
         )
     return UserOut(id=user.id, email=user.email)
+
+
+def get_catalog() -> Catalog:
+    """The in-memory catalogue, or 503 while it is not loaded."""
+    catalog = catalog_state.get()
+    if catalog is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The catalogue is not loaded yet. Please try again shortly.",
+        )
+    return catalog
