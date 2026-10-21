@@ -1,5 +1,6 @@
 """Shared FastAPI dependencies."""
 
+import numpy as np
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -81,3 +82,11 @@ def get_catalog() -> Catalog:
             detail="The catalogue is not loaded yet. Please try again shortly.",
         )
     return catalog
+
+
+def get_rng() -> np.random.Generator:
+    """Fresh randomness per request, so the exploration picks vary.
+
+    Tests replace this with a seeded generator to get repeatable feeds.
+    """
+    return np.random.default_rng()

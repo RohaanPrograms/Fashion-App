@@ -414,6 +414,11 @@ def api(client, small_catalog):
     app.dependency_overrides[get_current_user] = lambda: UserOut(id=current["id"])
     app.dependency_overrides[get_interaction_store] = lambda: interactions
 
+    from app.api.deps import get_rng
+    from ml.constants import RANDOM_SEED
+
+    app.dependency_overrides[get_rng] = lambda: np.random.default_rng(RANDOM_SEED)
+
     yield SimpleNamespace(
         client=client,
         interactions=interactions,
