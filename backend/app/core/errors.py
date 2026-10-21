@@ -28,6 +28,10 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+# Shown whenever Supabase could not be reached. Deliberately says nothing about
+# credentials or data, because when the request never landed we know nothing.
+UNAVAILABLE_DETAIL = "The service is temporarily unavailable. Please try again shortly."
+
 # httpx.TransportError covers ConnectError, ConnectTimeout, ReadTimeout,
 # NetworkError and friends — everything that means "the request never landed".
 # OSError covers lower-level socket failures such as socket.gaierror, which is

@@ -9,13 +9,14 @@ Interactive docs at http://localhost:8000/docs
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
-from app.api.v1 import auth
+from app.api.v1 import auth, interactions
 from app.core.config import get_settings
-from app.core.errors import log_upstream_failure
+from app.core.errors import UNAVAILABLE_DETAIL, is_infrastructure_error, log_upstream_failure
 from app.core.supabase_client import get_service_client
 from app.recs.catalog import catalog_state
 
@@ -49,6 +50,20 @@ app.add_middleware(
 )
 
 app.include_router(auth.router, prefix="/v1")
+app.include_router(interactions.router, prefix="/v1")
+
+
+@app.exception_handler(Exception)
+async def unhandled_error(request: Request, exc: Exception) -> JSONResponse:
+    """Any uncaught error becomes a clean JSON answer, never a stack trace.
+
+    If Supabase could not be reached, say so — 503, "try again" — because
+    nothing is wrong with the request. Anything else is a bug: 500.
+    """
+    log_upstream_failure(f"{request.method} {request.url.path}", exc)
+    if is_infrastructure_error(exc):
+        return JSONResponse(status_code=503, content={"detail": UNAVAILABLE_DETAIL})
+    return JSONResponse(status_code=500, content={"detail": "Something went wrong on our side."})
 
 
 @app.get("/health", tags=["meta"])

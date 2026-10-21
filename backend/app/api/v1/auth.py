@@ -19,7 +19,7 @@ from typing import NoReturn
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.deps import get_current_user
-from app.core.errors import is_infrastructure_error, log_upstream_failure
+from app.core.errors import UNAVAILABLE_DETAIL, is_infrastructure_error, log_upstream_failure
 from app.core.supabase_client import get_anon_client
 from app.schemas.auth import (
     AuthResponse,
@@ -57,13 +57,6 @@ def _client_or_503():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
         ) from exc
-
-
-# Shown whenever Supabase could not be reached. Deliberately says nothing about
-# credentials, because when the request never landed we know nothing about them.
-UNAVAILABLE_DETAIL = (
-    "The authentication service is temporarily unavailable. Please try again shortly."
-)
 
 
 def _fail(

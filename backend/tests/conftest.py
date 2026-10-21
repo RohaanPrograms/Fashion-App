@@ -372,3 +372,52 @@ def no_catalog_by_default(monkeypatch):
     catalog_state.set(None)
     yield
     catalog_state.set(None)
+
+
+USER_A = "aaaaaaaa-0000-4000-8000-000000000001"
+USER_B = "bbbbbbbb-0000-4000-8000-000000000002"
+
+
+class FakeInteractionStore:
+    """In-memory stand-in for SupabaseInteractionStore, with the same methods."""
+
+    def __init__(self):
+        self.rows: list[dict] = []
+
+    def history_rows(self, user_id):
+        return [dict(r) for r in self.rows if r["user_id"] == user_id]
+
+    def add(self, user_id, product_id, kind, source, dwell_time_ms=None):
+        self.rows.append(
+            {"user_id": user_id, "product_id": product_id, "type": kind,
+             "source": source, "dwell_time_ms": dwell_time_ms, "created_at": len(self.rows)}
+        )
+
+    def clear(self, user_id):
+        before = len(self.rows)
+        self.rows = [r for r in self.rows if r["user_id"] != user_id]
+        return before - len(self.rows)
+
+
+@pytest.fixture
+def api(client, small_catalog):
+    """The real app signed in as USER_A, with the small catalogue and
+    in-memory stores instead of Supabase. `api.sign_in_as(USER_B)` switches user."""
+    from app.api.deps import get_current_user
+    from app.db.interactions import get_interaction_store
+    from app.recs.catalog import catalog_state
+    from app.schemas.auth import UserOut
+
+    interactions = FakeInteractionStore()
+    current = {"id": USER_A}
+    catalog_state.set(small_catalog)
+    app.dependency_overrides[get_current_user] = lambda: UserOut(id=current["id"])
+    app.dependency_overrides[get_interaction_store] = lambda: interactions
+
+    yield SimpleNamespace(
+        client=client,
+        interactions=interactions,
+        sign_in_as=lambda user_id: current.update(id=user_id),
+    )
+
+    app.dependency_overrides.clear()
