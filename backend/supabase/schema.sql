@@ -230,7 +230,7 @@ create table if not exists public.interactions (
   product_id uuid not null references public.products (id) on delete cascade,
 
   type text not null check (
-    type in ('like', 'dislike', 'wishlist', 'cart', 'view', 'skip')
+    type in ('like', 'dislike', 'wishlist', 'cart', 'view', 'skip', 'remove')
   ),
 
   -- Milliseconds spent looking at the item before acting. Capped at 60s
@@ -238,8 +238,21 @@ create table if not exists public.interactions (
   -- they were fascinated.
   dwell_time_ms integer check (dwell_time_ms >= 0 and dwell_time_ms <= 60000),
 
-  source text not null check (source in ('feed', 'search', 'similar')),
+  source text not null check (source in ('feed', 'search', 'similar', 'wardrobe')),
   created_at timestamptz not null default now()
+);
+
+-- "create table if not exists" skips the block above on an existing database,
+-- so the widened checks are re-applied explicitly. 'remove' takes a garment
+-- out of the wardrobe without unliking it; 'wardrobe' records where.
+-- Postgres names an inline column check <table>_<column>_check.
+alter table public.interactions drop constraint if exists interactions_type_check;
+alter table public.interactions add constraint interactions_type_check check (
+  type in ('like', 'dislike', 'wishlist', 'cart', 'view', 'skip', 'remove')
+);
+alter table public.interactions drop constraint if exists interactions_source_check;
+alter table public.interactions add constraint interactions_source_check check (
+  source in ('feed', 'search', 'similar', 'wardrobe')
 );
 
 -- "This user's recent activity" — the style-vector build in Phase 3.
@@ -281,6 +294,30 @@ create index if not exists cart_user_idx on public.cart_items (user_id);
 
 
 -- =====================================================================
+--  outfits / outfit_items — saved sets of 2–5 garments
+-- =====================================================================
+-- The API enforces "2 to 5 items"; the primary key below enforces "one item
+-- per slot" in the database too. No total price column: it is computed on
+-- read, because a stored total goes stale the moment a price changes.
+create table if not exists public.outfits (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users (id) on delete cascade,
+  name text not null check (char_length(name) between 1 and 60),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.outfit_items (
+  outfit_id uuid not null references public.outfits (id) on delete cascade,
+  product_id uuid not null references public.products (id) on delete cascade,
+  slot text not null check (slot in ('top', 'bottom', 'full_body', 'shoes', 'accessory')),
+  primary key (outfit_id, slot)
+);
+
+create index if not exists outfits_user_created_idx
+  on public.outfits (user_id, created_at desc);
+
+
+-- =====================================================================
 --  Row Level Security
 -- =====================================================================
 -- Enabling RLS switches a table from "anyone with the anon key reads
@@ -290,6 +327,8 @@ alter table public.products       enable row level security;
 alter table public.interactions   enable row level security;
 alter table public.wishlist_items enable row level security;
 alter table public.cart_items     enable row level security;
+alter table public.outfits        enable row level security;
+alter table public.outfit_items   enable row level security;
 
 -- auth.uid() is the id of whoever's token accompanied the request. It is
 -- set by Supabase from the verified JWT and cannot be spoofed by the client.
@@ -351,6 +390,43 @@ create policy cart_insert_own on public.cart_items
 drop policy if exists cart_delete_own on public.cart_items;
 create policy cart_delete_own on public.cart_items
   for delete to authenticated using (auth.uid() = user_id);
+
+-- ---- interactions: you may clear your own history ("start over") ----
+drop policy if exists interactions_delete_own on public.interactions;
+create policy interactions_delete_own on public.interactions
+  for delete to authenticated using (auth.uid() = user_id);
+
+-- ---- outfits: read/add/remove your own ----
+drop policy if exists outfits_select_own on public.outfits;
+create policy outfits_select_own on public.outfits
+  for select to authenticated using (auth.uid() = user_id);
+
+drop policy if exists outfits_insert_own on public.outfits;
+create policy outfits_insert_own on public.outfits
+  for insert to authenticated with check (auth.uid() = user_id);
+
+drop policy if exists outfits_delete_own on public.outfits;
+create policy outfits_delete_own on public.outfits
+  for delete to authenticated using (auth.uid() = user_id);
+
+-- ---- outfit_items: belong to whoever owns the outfit ----
+drop policy if exists outfit_items_select_own on public.outfit_items;
+create policy outfit_items_select_own on public.outfit_items
+  for select to authenticated using (
+    exists (select 1 from public.outfits o where o.id = outfit_id and o.user_id = auth.uid())
+  );
+
+drop policy if exists outfit_items_insert_own on public.outfit_items;
+create policy outfit_items_insert_own on public.outfit_items
+  for insert to authenticated with check (
+    exists (select 1 from public.outfits o where o.id = outfit_id and o.user_id = auth.uid())
+  );
+
+drop policy if exists outfit_items_delete_own on public.outfit_items;
+create policy outfit_items_delete_own on public.outfit_items
+  for delete to authenticated using (
+    exists (select 1 from public.outfits o where o.id = outfit_id and o.user_id = auth.uid())
+  );
 
 
 -- =====================================================================
