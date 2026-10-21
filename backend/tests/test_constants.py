@@ -13,3 +13,9 @@ def test_cold_start_likes_is_positive():
 
 def test_explore_count_fits_in_batch():
     assert constants.EXPLORE_COUNT < constants.FEED_BATCH_SIZE
+
+
+def test_a_removed_garment_cannot_come_back_in_the_very_next_batch():
+    from ml.constants import FEED_BATCH_SIZE, REMOVE_COOLDOWN_SWIPES
+
+    assert REMOVE_COOLDOWN_SWIPES >= FEED_BATCH_SIZE

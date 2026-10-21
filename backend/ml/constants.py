@@ -18,6 +18,11 @@ FEED_BATCH_SIZE = 10
 EXPLORE_COUNT = 2      # of each batch, how many are sampled rather than top-ranked
 EXPLORE_POOL = 100     # sampled from the top N of the ranking
 
+# A garment removed from the wardrobe still counts as a like, so it is the
+# closest thing to the user's taste and would reappear at once. It stays out
+# of the feed until this many more swipes have happened.
+REMOVE_COOLDOWN_SWIPES = 20
+
 # Every source of randomness in the project uses this, so results reproduce.
 RANDOM_SEED = 1234
 
