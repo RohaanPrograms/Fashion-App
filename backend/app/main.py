@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
-from app.api.v1 import auth, feed, interactions
+from app.api.v1 import auth, feed, interactions, wardrobe
 from app.core.config import get_settings
 from app.core.errors import UNAVAILABLE_DETAIL, is_infrastructure_error, log_upstream_failure
 from app.core.supabase_client import get_service_client
@@ -52,6 +52,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/v1")
 app.include_router(interactions.router, prefix="/v1")
 app.include_router(feed.router, prefix="/v1")
+app.include_router(wardrobe.router, prefix="/v1")
 
 
 @app.exception_handler(Exception)
