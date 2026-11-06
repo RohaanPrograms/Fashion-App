@@ -399,6 +399,36 @@ class FakeInteractionStore:
         return before - len(self.rows)
 
 
+class FakeOutfitStore:
+    """In-memory stand-in for SupabaseOutfitStore, with the same methods."""
+
+    def __init__(self):
+        self.outfits: list[dict] = []
+
+    def create(self, user_id, name, items):
+        outfit_id = f"00000000-0000-4000-9000-{len(self.outfits):012d}"
+        self.outfits.append(
+            {"id": outfit_id, "user_id": user_id, "name": name,
+             "created_at": len(self.outfits), "items": list(items)}
+        )
+        return outfit_id
+
+    def list(self, user_id):
+        mine = [o for o in self.outfits if o["user_id"] == user_id]
+        return [
+            {"id": o["id"], "name": o["name"], "created_at": o["created_at"],
+             "outfit_items": [{"product_id": p, "slot": s} for p, s in o["items"]]}
+            for o in sorted(mine, key=lambda o: o["created_at"], reverse=True)
+        ]
+
+    def delete(self, user_id, outfit_id):
+        before = len(self.outfits)
+        self.outfits = [
+            o for o in self.outfits if not (o["id"] == outfit_id and o["user_id"] == user_id)
+        ]
+        return len(self.outfits) < before
+
+
 @pytest.fixture
 def api(client, small_catalog):
     """The real app signed in as USER_A, with the small catalogue and
@@ -419,9 +449,15 @@ def api(client, small_catalog):
 
     app.dependency_overrides[get_rng] = lambda: np.random.default_rng(RANDOM_SEED)
 
+    from app.db.outfits import get_outfit_store
+
+    outfits = FakeOutfitStore()
+    app.dependency_overrides[get_outfit_store] = lambda: outfits
+
     yield SimpleNamespace(
         client=client,
         interactions=interactions,
+        outfits=outfits,
         sign_in_as=lambda user_id: current.update(id=user_id),
     )
 
