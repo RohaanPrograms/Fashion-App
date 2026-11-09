@@ -8,7 +8,7 @@ from jwt import PyJWTError
 
 from app.core.config import get_settings  # noqa: F401 — patched in tests
 from app.core.errors import is_infrastructure_error, log_upstream_failure
-from app.core.security import decode_access_token, uses_local_verification
+from app.core.security import verify_locally
 from app.core.supabase_client import get_anon_client
 from app.recs.catalog import Catalog, catalog_state
 from app.schemas.auth import UserOut
@@ -26,19 +26,24 @@ def get_current_user(
     token = credentials.credentials
 
     # Fast path: check the signature ourselves. No network, no Supabase quota.
-    # Only taken when the configured secret has been confirmed to belong to this
-    # project — see uses_local_verification() for why that check exists.
-    if uses_local_verification():
-        try:
-            claims = decode_access_token(token)
-        except PyJWTError as exc:
-            # Expired, forged, tampered with, or malformed. Supabase would have
-            # said no too; we just said it faster.
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired token",
-            ) from exc
-        return UserOut(id=claims["sub"], email=claims.get("email"))
+    # ES256 tokens are checked against the project's published public keys;
+    # HS256 tokens only when the configured secret has been confirmed to
+    # belong to this project. See app/core/security.py.
+    try:
+        claims = verify_locally(token)
+    except PyJWTError as exc:
+        # Expired, forged, tampered with, or malformed. Supabase would have
+        # said no too; we just said it faster.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        ) from exc
+    if claims is not None:
+        return UserOut(
+            id=claims["sub"],
+            email=claims.get("email"),
+            is_anonymous=bool(claims.get("is_anonymous", False)),
+        )
 
     try:
         client = get_anon_client()
@@ -70,7 +75,9 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
         )
-    return UserOut(id=user.id, email=user.email)
+    return UserOut(
+        id=user.id, email=user.email, is_anonymous=bool(getattr(user, "is_anonymous", False))
+    )
 
 
 def get_catalog() -> Catalog:

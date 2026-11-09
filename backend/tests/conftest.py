@@ -51,6 +51,9 @@ def deterministic_auth_config(monkeypatch):
     for target in ("app.core.security.get_settings", "app.api.deps.get_settings"):
         monkeypatch.setattr(target, lambda: neutral, raising=False)
     security.uses_local_verification.cache_clear()
+    # No test downloads the real public signing keys; tests that check ES256
+    # tokens install a fake key list of their own.
+    monkeypatch.setattr(security, "jwks_client", lambda: None)
 
     yield
 
@@ -73,6 +76,9 @@ class _StubAuth:
         raise self._exc
 
     def get_user(self, *args, **kwargs):
+        raise self._exc
+
+    def sign_in_anonymously(self, *args, **kwargs):
         raise self._exc
 
 
@@ -372,6 +378,16 @@ def no_catalog_by_default(monkeypatch):
     catalog_state.set(None)
     yield
     catalog_state.set(None)
+
+
+@pytest.fixture(autouse=True)
+def fresh_guest_limit():
+    """The guest sign-in counter is module-level; every test starts from zero."""
+    from app.api.v1.auth import guest_signins
+
+    guest_signins.reset()
+    yield
+    guest_signins.reset()
 
 
 USER_A = "aaaaaaaa-0000-4000-8000-000000000001"

@@ -47,10 +47,11 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = ""
     SUPABASE_ANON_KEY: str = ""
     SUPABASE_SERVICE_ROLE_KEY: str = ""
-    # Signs and verifies access tokens. With it set (and confirmed against the
-    # anon key at startup), the API checks tokens itself instead of asking
-    # Supabase on every request — see app/core/security.py. Blank falls back
-    # to asking Supabase.
+    # Only for projects still on Supabase's legacy shared-secret (HS256) token
+    # signing. With it set (and confirmed against the anon key at startup), the
+    # API checks HS256 tokens itself. Projects on the newer signing keys (ES256)
+    # need nothing here: those tokens are checked against the project's
+    # published public keys. See app/core/security.py.
     SUPABASE_JWT_SECRET: str = ""
     # Public Storage bucket holding the resized product photos.
     PRODUCT_IMAGE_BUCKET: str = ""

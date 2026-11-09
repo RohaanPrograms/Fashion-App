@@ -3,6 +3,7 @@
 POST /v1/auth/signup  — create account
 POST /v1/auth/login   — email/password login
 POST /v1/auth/refresh — trade a refresh token for a fresh access token
+POST /v1/auth/anonymous — start a guest session (no email)
 GET  /v1/auth/me      — current user (requires Bearer token)
 
 Two tokens are in play. The *access token* is what the app sends on every
@@ -14,12 +15,14 @@ Every call here passes its token explicitly. The Supabase client is a shared
 singleton, so we never rely on whatever session it happens to hold internally.
 """
 
+import math
 from typing import NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.api.deps import get_current_user
 from app.core.errors import UNAVAILABLE_DETAIL, is_infrastructure_error, log_upstream_failure
+from app.core.rate_limit import RateLimiter, client_ip
 from app.core.supabase_client import get_anon_client
 from app.schemas.auth import (
     AuthResponse,
@@ -31,6 +34,11 @@ from app.schemas.auth import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+# New guest accounts per IP address per hour. Generous enough for an office of
+# people trying the demo; tight enough that one script cannot create hundreds.
+GUEST_SIGNINS_PER_HOUR = 5
+guest_signins = RateLimiter(GUEST_SIGNINS_PER_HOUR, window_seconds=3600)
 
 
 def _to_auth_response(result) -> AuthResponse:
@@ -45,7 +53,9 @@ def _to_auth_response(result) -> AuthResponse:
             expires_in=getattr(s, "expires_in", None),
         )
     return AuthResponse(
-        user=UserOut(id=user.id, email=user.email),
+        user=UserOut(
+            id=user.id, email=user.email, is_anonymous=bool(getattr(user, "is_anonymous", False))
+        ),
         session=session,
     )
 
@@ -116,6 +126,45 @@ def login(body: LoginRequest) -> AuthResponse:
             exc,
             auth_status=status.HTTP_401_UNAUTHORIZED,
             auth_detail="Invalid email or password",
+        )
+    return _to_auth_response(result)
+
+
+@router.post("/anonymous", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+def anonymous(request: Request) -> AuthResponse:
+    """Start a guest session: a real account with no email or password.
+
+    Lets a visitor start swiping straight away. Everything downstream is the
+    same: the token passes get_current_user and swipes save under its user id.
+
+    Limited to GUEST_SIGNINS_PER_HOUR per IP address, checked before Supabase
+    is asked, so hammering this endpoint costs Supabase nothing.
+
+    Needs "Allow anonymous sign-ins" switched on in Supabase. When it is off,
+    Supabase refuses and this returns 503 — a server setting, not the caller's
+    fault, so not a 4xx.
+    """
+    wait = guest_signins.hit(client_ip(request))
+    if wait is not None:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many guest sign-ins from your network. Please try again later.",
+            headers={"Retry-After": str(max(1, math.ceil(wait)))},
+        )
+    client = _client_or_503()
+    try:
+        result = client.auth.sign_in_anonymously()
+    except Exception as exc:  # noqa: BLE001
+        _fail(
+            "anonymous sign-in",
+            exc,
+            auth_status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            auth_detail="Guest sign-in is not available right now.",
+        )
+    if result.user is None or getattr(result, "session", None) is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Guest sign-in is not available right now.",
         )
     return _to_auth_response(result)
 

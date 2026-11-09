@@ -26,13 +26,26 @@ We can catch that for free. The project's own anon key is a JWT signed with the
 same secret, so if our secret cannot verify the anon key, our secret is wrong.
 When that happens we log loudly and keep using the network path, which still
 works. A misconfiguration then costs latency instead of a total outage.
+
+Newer signing keys (ES256)
+--------------------------
+That shared-secret scheme is Supabase's legacy one. Projects on its newer
+signing keys sign access tokens with ES256: a private key Supabase never
+shares, checked with a public key it publishes at
+<project>/auth/v1/.well-known/jwks.json (a "JWKS", JSON Web Key Set). No secret
+is needed — the published key can verify a token but never create one.
+
+The trap this closes: on such a project the anon key is still signed with the
+legacy secret, so the self-check above passes, while every user token is ES256
+and the HS256-only check refused them all. Each token's own header now says
+which scheme signed it, and ES256 tokens are checked against the published keys.
 """
 
 import logging
 from functools import lru_cache
 
 import jwt
-from jwt import PyJWTError
+from jwt import PyJWKClient, PyJWKClientConnectionError, PyJWTError
 
 from app.core.config import get_settings
 
@@ -47,6 +60,17 @@ AUDIENCE = "authenticated"
 # token with its algorithm set to "none" and no signature at all, and a naive
 # verifier would accept whatever claims it liked.
 ALGORITHMS = ["HS256"]
+
+# Public-key schemes Supabase's signing keys use. Kept apart from ALGORITHMS on
+# purpose: a token claiming one of these is only ever checked against a
+# published public key, and an HS256 token only ever against the secret, so a
+# token cannot pick the scheme that suits a forger.
+ASYMMETRIC_ALGORITHMS = ("ES256", "RS256")
+
+# How long the downloaded key list is trusted before it is fetched again. A
+# token signed by a key not in the list also triggers one refetch, so a key
+# rotation is picked up straight away.
+JWKS_CACHE_SECONDS = 600
 
 
 @lru_cache
@@ -101,6 +125,61 @@ def uses_local_verification() -> bool:
 
     logger.info("JWT secret verified against the project — using local token verification.")
     return True
+
+
+def jwks_url(supabase_url: str) -> str:
+    """Where a Supabase project publishes its public signing keys."""
+    return f"{supabase_url.rstrip('/')}/auth/v1/.well-known/jwks.json"
+
+
+@lru_cache
+def jwks_client() -> PyJWKClient | None:
+    """One shared key-list client, so the list is downloaded once and cached."""
+    settings = get_settings()
+    if not settings.SUPABASE_URL:
+        return None
+    return PyJWKClient(
+        jwks_url(settings.SUPABASE_URL), cache_jwk_set=True, lifespan=JWKS_CACHE_SECONDS, timeout=5
+    )
+
+
+def verify_locally(token: str) -> dict | None:
+    """Check a token here if possible; return its claims.
+
+    Returns None when it cannot be checked locally — then the caller asks
+    Supabase, exactly as before local verification existed. Raises PyJWTError
+    when the token is checked and is not acceptable (forged, expired, wrong
+    audience, signed by a key the project never published).
+    """
+    try:
+        algorithm = jwt.get_unverified_header(token).get("alg")
+    except PyJWTError:
+        algorithm = None  # not a readable JWT; handled below like any other
+
+    if algorithm in ASYMMETRIC_ALGORITHMS:
+        client = jwks_client()
+        if client is None:
+            return None
+        try:
+            signing_key = client.get_signing_key_from_jwt(token)
+        except PyJWKClientConnectionError as exc:
+            # Could not download the key list. Not the caller's fault: ask
+            # Supabase instead of locking every user out.
+            logger.warning("Could not fetch the public signing keys (%s); asking Supabase.", exc)
+            return None
+        return jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=[algorithm],
+            audience=AUDIENCE,
+            options={"require": ["exp", "sub"]},
+        )
+
+    if uses_local_verification():
+        # Legacy shared-secret project: unchanged behaviour. Anything that is
+        # not a valid HS256 token (including alg "none") is refused here.
+        return decode_access_token(token)
+    return None
 
 
 def decode_access_token(token: str) -> dict:
