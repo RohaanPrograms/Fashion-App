@@ -48,7 +48,11 @@ def deterministic_auth_config(monkeypatch):
         SUPABASE_ANON_KEY="",
         SUPABASE_JWT_SECRET="",
     )
-    for target in ("app.core.security.get_settings", "app.api.deps.get_settings"):
+    for target in (
+        "app.core.security.get_settings",
+        "app.api.deps.get_settings",
+        "app.api.v1.auth.get_settings",
+    ):
         monkeypatch.setattr(target, lambda: neutral, raising=False)
     security.uses_local_verification.cache_clear()
     # No test downloads the real public signing keys; tests that check ES256

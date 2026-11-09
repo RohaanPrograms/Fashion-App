@@ -21,6 +21,7 @@ from typing import NoReturn
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.api.deps import get_current_user
+from app.core.config import get_settings
 from app.core.errors import UNAVAILABLE_DETAIL, is_infrastructure_error, log_upstream_failure
 from app.core.rate_limit import RateLimiter, client_ip
 from app.core.supabase_client import get_anon_client
@@ -144,7 +145,7 @@ def anonymous(request: Request) -> AuthResponse:
     Supabase refuses and this returns 503 — a server setting, not the caller's
     fault, so not a 4xx.
     """
-    wait = guest_signins.hit(client_ip(request))
+    wait = guest_signins.hit(client_ip(request, get_settings().CLIENT_IP_HEADER))
     if wait is not None:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     # Comma-separated allowed CORS origins. "*" allows all (dev only).
     CORS_ORIGINS: str = "*"
 
+    # Header in which a proxy in front of the server puts the visitor's IP
+    # address (on Railway: X-Real-IP). Blank means "no proxy": use the
+    # connection's own address and trust no header, because without a proxy
+    # any visitor could write whatever they like into one.
+    CLIENT_IP_HEADER: str = ""
+
     # Supabase
     SUPABASE_URL: str = ""
     SUPABASE_ANON_KEY: str = ""

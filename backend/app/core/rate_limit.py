@@ -76,21 +76,21 @@ class RateLimiter:
                 del self._events[key]
 
 
-def client_ip(request: Request) -> str:
+def client_ip(request: Request, trusted_header: str = "") -> str:
     """The caller's IP address.
 
-    In production the server sits behind Railway's proxy, so the connection
-    comes from the proxy, not the visitor. The proxy records the visitor's
-    address in X-Forwarded-For, ADDING it to the end of whatever the request
-    already carried. Entries before it came from the visitor and may be made
-    up, so only the last one is trusted.
+    Behind a proxy (Railway in production) every connection comes from the
+    proxy, so the visitor's address must come from a header the proxy sets:
+    `trusted_header`, from the CLIENT_IP_HEADER setting (Railway documents
+    X-Real-IP for this). X-Forwarded-For is deliberately not used: Railway does
+    not document how it treats one a visitor sends, so it could be made up.
 
-    With no proxy (local development) the header is normally absent and the
-    connection's own address is used.
+    With no proxy configured (local development), no header is trusted at all
+    — any visitor could write anything into one — and the connection's own
+    address is used.
     """
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        last = forwarded.split(",")[-1].strip()
-        if last:
-            return last
+    if trusted_header:
+        value = request.headers.get(trusted_header, "").strip()
+        if value:
+            return value
     return request.client.host if request.client else "unknown"

@@ -68,6 +68,44 @@ APP_ENV=prod uvicorn app.main:app
 Startup fails loudly if `APP_ENV` is unknown, or if `CORS_ORIGINS` is `*`
 outside dev. `GET /health` echoes the active `environment`.
 
+## Deploying (Railway)
+
+The API runs on Railway. Railway installs `requirements.txt` only, so the
+training libraries are never deployed, and reads the Python version from
+`.python-version`. Settings come from Railway's variables, not a file.
+
+In the Railway service's **Settings**:
+
+| Setting | Value |
+|---|---|
+| Source → Root Directory | `backend` |
+| Deploy → Custom Start Command | `/bin/sh -c "exec python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT"` |
+| Deploy → Healthcheck Path | `/health/ready` |
+| Networking → Public Networking | Generate Domain |
+
+The start command runs through a shell so `$PORT` (chosen by Railway) is
+filled in. The health check means a new version only receives traffic once it
+can reach Supabase and has loaded the catalogue.
+
+**Variables:**
+
+| Name | Value |
+|---|---|
+| `APP_ENV` | `prod` |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | the project's values |
+| `CORS_ORIGINS` | explicit origins, comma-separated (`*` is refused outside dev) |
+| `CLIENT_IP_HEADER` | `X-Real-IP`: where Railway's proxy puts the visitor's IP, used by the guest sign-in limit |
+
+`SUPABASE_JWT_SECRET` is only needed for projects still on Supabase's legacy
+HS256 token signing; tokens from the newer signing keys are verified with the
+project's published public keys.
+
+Check a deploy end to end (creates one guest account, likes, removes, clears):
+
+```bash
+python -m scripts.smoke_test --base-url https://<your-app>.up.railway.app
+```
+
 ## Endpoints (v1)
 
 | Method | Path             | Auth        | Purpose                       |
@@ -131,6 +169,7 @@ app/
     security.py      # access-token verification
     errors.py        # outage vs bad-credential error mapping
     supabase_client.py
+    rate_limit.py    # per-IP limit on guest sign-ins
   api/
     deps.py          # shared dependencies (current-user resolver)
     v1/auth.py       # auth routes
