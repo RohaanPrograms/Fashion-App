@@ -1,7 +1,8 @@
 # Fashion App — Backend (FastAPI)
 
-The API (config, Supabase wiring, `/auth`, `/health`) plus the offline ML
-pipeline that builds the catalog and, next, trains the recommender.
+The API behind the swipe feed (personalised recommendations, saved swipes, a
+wardrobe, outfits, guest sign-in) plus the offline ML pipeline that builds the
+catalog and trains the ALS recommender whose item vectors the feed ranks.
 
 ## Setup
 
@@ -108,13 +109,28 @@ python -m scripts.smoke_test --base-url https://<your-app>.up.railway.app
 
 ## Endpoints (v1)
 
-| Method | Path             | Auth        | Purpose                       |
-|--------|------------------|-------------|-------------------------------|
-| GET    | `/health`        | none        | Liveness + config check       |
-| POST   | `/v1/auth/signup`| none        | Create account                |
-| POST   | `/v1/auth/login` | none        | Email/password login          |
-| POST   | `/v1/auth/refresh`| none       | Swap a refresh token for a fresh access token |
-| GET    | `/v1/auth/me`    | Bearer token| Current authenticated user    |
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| GET | `/health` | none | Liveness: the process is up (never calls out) |
+| GET | `/health/ready` | none | Readiness: Supabase reachable and the catalogue loaded |
+| POST | `/v1/auth/signup` | none | Create account |
+| POST | `/v1/auth/login` | none | Email/password login |
+| POST | `/v1/auth/anonymous` | none | Start a guest session (no email); max 5 per visitor IP per hour |
+| POST | `/v1/auth/refresh` | none | Swap a refresh token for a fresh access token |
+| GET | `/v1/auth/me` | Bearer token | Current user, incl. `is_anonymous` |
+| GET | `/v1/feed?limit=10&exclude=…` | Bearer token | Next cards: best-sellers until 3 likes, then personalised; each card carries its reason |
+| GET | `/v1/products/{id}` | Bearer token | One garment's details |
+| POST | `/v1/interactions` | Bearer token | Record a like or dislike |
+| DELETE | `/v1/interactions` | Bearer token | Start over: forget every swipe |
+| GET | `/v1/wardrobe` | Bearer token | Liked garments, most recent first |
+| DELETE | `/v1/wardrobe/{product_id}` | Bearer token | Take one out (still counts toward taste; may return to the feed after 20 swipes) |
+| GET | `/v1/outfits` | Bearer token | My outfits with computed total prices |
+| POST | `/v1/outfits` | Bearer token | Save 2–5 garments, one per slot (a full-body item excludes a top or bottom) |
+| DELETE | `/v1/outfits/{id}` | Bearer token | Delete one of my outfits |
+
+The feed's `exclude` lists cards the app already holds, so prefetching the next
+batch never resends them. Interactive docs with every request and response
+shape are at `/docs` while the server runs.
 
 Access tokens expire after one hour. The mobile app stores the refresh token
 returned by login/signup and calls `/v1/auth/refresh` automatically just before
@@ -163,23 +179,37 @@ categorical and integer types (~0.6 GB of RAM rather than ~6 GB as text).
 
 ```
 app/
-  main.py            # FastAPI app + middleware + router wiring
+  main.py            # FastAPI app: startup catalogue load, routers, error handler
   core/
     config.py        # env-backed settings (single source of env access)
-    security.py      # access-token verification
+    security.py      # access-token verification (published ES256 keys, or HS256 secret)
     errors.py        # outage vs bad-credential error mapping
-    supabase_client.py
     rate_limit.py    # per-IP limit on guest sign-ins
+    supabase_client.py
+  recs/              # pure, in-memory recommendation logic
+    catalog.py       # 5,000 products + item vectors, loaded once at startup
+    history.py       # swipe log -> likes, dislikes, wardrobe, hidden
+    feed.py          # picks each batch with ml.ranking, with a reason per card
+    outfits.py       # outfit rules and computed totals
+  db/                # the only code that reads/writes per-user tables;
+    interactions.py  #   every query filters by user_id (tested)
+    outfits.py
   api/
-    deps.py          # shared dependencies (current-user resolver)
-    v1/auth.py       # auth routes
-  schemas/auth.py    # request/response models
-ml/                  # pure functions, no I/O — the tested core of the pipeline
+    deps.py          # shared dependencies (current user, catalogue, randomness)
+    v1/              # auth, feed, interactions, wardrobe, outfits routes
+  schemas/           # request/response models
+ml/                  # pure functions — the tested core of the pipeline
   constants.py       # shared tunables, one copy for evaluation and API
   selection.py       # catalog selection
   split.py           # temporal train/holdout split
   images.py          # WebP resizing
-scripts/             # command-line wrappers around ml/ (see Data pipeline)
+  matrix.py          # sparse purchase matrix + index mapping
+  ranking.py         # style vector, cosine rank, dedupe, exploration (shared with the feed)
+  metrics.py         # recall@k, MAP@k
+  evaluate.py        # cold-start evaluation against baselines
+  train.py           # ALS training
+  paging.py          # paging past Supabase's 1,000-row limit (no heavy imports)
+scripts/             # command-line wrappers (see Data pipeline), plus smoke_test.py
 tests/               # pytest suite
 supabase/schema.sql  # tables, indexes, RLS — paste into the SQL Editor; re-runnable
 ```
