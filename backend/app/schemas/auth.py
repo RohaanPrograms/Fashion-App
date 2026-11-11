@@ -19,6 +19,29 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class UpgradeStartRequest(BaseModel):
+    """Step 1 of saving a guest's account: where to send the code."""
+
+    email: EmailStr
+
+
+class UpgradeStartOut(BaseModel):
+    email: EmailStr
+
+
+class UpgradeVerifyRequest(BaseModel):
+    """Step 2: the code from the email. Supabase's codes are digits only."""
+
+    email: EmailStr
+    code: str = Field(pattern=r"^\d{6,10}$")
+
+
+class PasswordRequest(BaseModel):
+    """Step 3: a password for the now-verified account."""
+
+    password: str = Field(min_length=8, max_length=128)
+
+
 class UserOut(BaseModel):
     id: str
     email: EmailStr | None = None

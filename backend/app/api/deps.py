@@ -16,6 +16,16 @@ from app.schemas.auth import UserOut
 _bearer = HTTPBearer(auto_error=True)
 
 
+def get_bearer_token(
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+) -> str:
+    """The caller's raw access token, for calls to Supabase made as them.
+
+    Only use alongside get_current_user, which is what checks the token.
+    """
+    return credentials.credentials
+
+
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(_bearer),
 ) -> UserOut:

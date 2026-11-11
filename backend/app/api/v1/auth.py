@@ -4,6 +4,9 @@ POST /v1/auth/signup  — create account
 POST /v1/auth/login   — email/password login
 POST /v1/auth/refresh — trade a refresh token for a fresh access token
 POST /v1/auth/anonymous — start a guest session (no email)
+POST /v1/auth/upgrade/start  — email a code to save a guest's account
+POST /v1/auth/upgrade/verify — the code turns the guest into a normal account (same id)
+POST /v1/auth/password       — set the password once the email is verified
 GET  /v1/auth/me      — current user (requires Bearer token)
 
 Two tokens are in play. The *access token* is what the app sends on every
@@ -18,19 +21,24 @@ singleton, so we never rely on whatever session it happens to hold internally.
 import math
 from typing import NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
-from app.api.deps import get_current_user
+from app.api.deps import get_bearer_token, get_current_user
+from app.core import gotrue
 from app.core.config import get_settings
 from app.core.errors import UNAVAILABLE_DETAIL, is_infrastructure_error, log_upstream_failure
 from app.core.rate_limit import RateLimiter, client_ip
-from app.core.supabase_client import get_anon_client
+from app.core.supabase_client import get_anon_client, get_service_client
 from app.schemas.auth import (
     AuthResponse,
     LoginRequest,
+    PasswordRequest,
     RefreshRequest,
     Session,
     SignupRequest,
+    UpgradeStartOut,
+    UpgradeStartRequest,
+    UpgradeVerifyRequest,
     UserOut,
 )
 
@@ -68,6 +76,47 @@ def _client_or_503():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
         ) from exc
+
+
+def _service_or_503():
+    try:
+        return get_service_client()
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
+
+
+def _auth_call(operation: str, call, refusals: dict[int, tuple[int, str]], fallback: str):
+    """Run a gotrue call; turn every failure into a fixed, hand-written error.
+
+    refusals maps Supabase's HTTP status to (our status, our message). Any
+    other refusal -> 400 with `fallback`. Unreachable or 5xx -> 503.
+    Supabase's own text only ever goes to the logs.
+    """
+    try:
+        return call()
+    except RuntimeError as exc:  # Supabase not configured
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
+    except gotrue.GoTrueError as exc:
+        log_upstream_failure(operation, exc)
+        if exc.status in refusals:
+            code, detail = refusals[exc.status]
+            raise HTTPException(status_code=code, detail=detail) from exc
+        if exc.status >= 500:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=UNAVAILABLE_DETAIL
+            ) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=fallback) from exc
+    except Exception as exc:  # noqa: BLE001
+        log_upstream_failure(operation, exc)
+        if is_infrastructure_error(exc):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=UNAVAILABLE_DETAIL
+            ) from exc
+        raise
 
 
 def _fail(
@@ -168,6 +217,122 @@ def anonymous(request: Request) -> AuthResponse:
             detail="Guest sign-in is not available right now.",
         )
     return _to_auth_response(result)
+
+
+WRONG_CODE = "That code is wrong or has expired. Ask for a new code."
+
+
+@router.post(
+    "/upgrade/start", response_model=UpgradeStartOut, status_code=status.HTTP_202_ACCEPTED
+)
+def upgrade_start(
+    body: UpgradeStartRequest,
+    current_user: UserOut = Depends(get_current_user),
+    token: str = Depends(get_bearer_token),
+) -> UpgradeStartOut:
+    """Step 1 of saving a guest's account: Supabase emails a one-time code
+    (its length is a Supabase setting; 8 digits on this project).
+
+    The account keeps its id through all three steps, so every swipe, like
+    and outfit stays with it.
+
+    "Is this a guest?" is answered by the database, not the token: a token
+    issued before an upgrade still says "guest" until it expires.
+    """
+    admin = _service_or_503()
+    try:
+        stored = admin.auth.admin.get_user_by_id(current_user.id).user
+    except Exception as exc:  # noqa: BLE001
+        _fail(
+            "upgrade lookup",
+            exc,
+            auth_status=status.HTTP_401_UNAUTHORIZED,
+            auth_detail="Invalid or expired token",
+        )
+    if not getattr(stored, "is_anonymous", False):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="This account already has an email."
+        )
+
+    _auth_call(
+        "upgrade start",
+        lambda: gotrue.request_email_change(token, body.email),
+        refusals={
+            422: (
+                status.HTTP_409_CONFLICT,
+                "That email is already registered. Log in instead.",
+            ),
+            429: (
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                "A code was sent very recently. Wait a minute, then ask again.",
+            ),
+        },
+        fallback="Couldn't send a code to that address.",
+    )
+    return UpgradeStartOut(email=body.email)
+
+
+@router.post("/upgrade/verify", response_model=AuthResponse)
+def upgrade_verify(
+    body: UpgradeVerifyRequest, current_user: UserOut = Depends(get_current_user)
+) -> AuthResponse:
+    """Step 2: the emailed code turns the guest into a normal account.
+
+    Same id, so everything is kept. Returns a fresh session, because the old
+    token still says "guest".
+    """
+    data = _auth_call(
+        "upgrade verify",
+        lambda: gotrue.verify_email_change(body.email, body.code),
+        refusals={
+            401: (status.HTTP_400_BAD_REQUEST, WRONG_CODE),
+            403: (status.HTTP_400_BAD_REQUEST, WRONG_CODE),
+        },
+        fallback=WRONG_CODE,
+    )
+    user = data.get("user") or {}
+    if user.get("id") != current_user.id:
+        # Can't happen through the app (the code is sent to the caller's own
+        # pending address), but never hand one account's session to another.
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="That code belongs to another account."
+        )
+    return AuthResponse(
+        user=UserOut(
+            id=user["id"],
+            email=user.get("email"),
+            is_anonymous=bool(user.get("is_anonymous", False)),
+        ),
+        session=Session(
+            access_token=data["access_token"],
+            refresh_token=data["refresh_token"],
+            expires_in=data.get("expires_in"),
+        ),
+    )
+
+
+@router.post("/password", status_code=status.HTTP_204_NO_CONTENT)
+def set_password(
+    body: PasswordRequest,
+    current_user: UserOut = Depends(get_current_user),
+    token: str = Depends(get_bearer_token),
+) -> Response:
+    """Step 3: give the now-verified account a password, so it can log in.
+
+    Separate from step 2 so that if it fails, the app retries just this,
+    with the fresh session it already holds.
+    """
+    if current_user.is_anonymous:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Confirm your email first."
+        )
+    _auth_call(
+        "set password",
+        lambda: gotrue.set_password(token, body.password),
+        refusals={},
+        fallback="That password was refused. Try a longer or less common one.",
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/refresh", response_model=AuthResponse)

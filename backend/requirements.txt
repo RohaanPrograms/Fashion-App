@@ -3,6 +3,9 @@ uvicorn[standard]==0.34.0
 pydantic[email]==2.10.4
 pydantic-settings==2.7.1
 supabase==2.11.0
+# Talks to Supabase Auth directly for the "save your wardrobe" email flow
+# (app/core/gotrue.py). Already installed by supabase; pinned because we import it.
+httpx==0.28.1
 python-dotenv==1.0.1
 # Verifies access tokens locally instead of asking Supabase on every request.
 # It already arrives as a dependency of supabase, but we import it directly, so

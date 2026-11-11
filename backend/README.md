@@ -101,6 +101,22 @@ can reach Supabase and has loaded the catalogue.
 HS256 token signing; tokens from the newer signing keys are verified with the
 project's published public keys.
 
+### Emails
+
+The "save your wardrobe" codes are sent by Supabase through **custom SMTP**
+(Brevo), configured in Supabase → Authentication → Emails → SMTP Settings, not
+in this repo. Supabase's built-in sender only delivers to the project's own team,
+so without custom SMTP real visitors would never receive a code. The **Change
+Email Address** template must show the code (`{{ .Token }}`): a guest adding an
+email is, to Supabase, an email change.
+
+Two Brevo settings this needs, both learned the hard way:
+- **Port 2525** (`smtp-relay.brevo.com`). On 587, Supabase stalled for ~40 s per email,
+  longer than its gateway waits, so every request failed with 504.
+- **Brevo → Security → Authorised IPs: blocking deactivated for SMTP keys.**
+  Supabase sends from Amazon servers whose addresses change; with blocking on,
+  Brevo refuses them with `525 5.7.1 Unauthorized IP address`.
+
 Check a deploy end to end (creates one guest account, likes, removes, clears):
 
 ```bash
@@ -116,6 +132,9 @@ python -m scripts.smoke_test --base-url https://<your-app>.up.railway.app
 | POST | `/v1/auth/signup` | none | Create account |
 | POST | `/v1/auth/login` | none | Email/password login |
 | POST | `/v1/auth/anonymous` | none | Start a guest session (no email); max 5 per visitor IP per hour |
+| POST | `/v1/auth/upgrade/start` | Bearer token (guest) | Save a guest's account, step 1: email a one-time code (8 digits on this project) to this address |
+| POST | `/v1/auth/upgrade/verify` | Bearer token | Step 2: the code turns the guest into a normal account with the **same id** (every swipe kept); returns a fresh session |
+| POST | `/v1/auth/password` | Bearer token (verified) | Step 3: set a password so the account can log in |
 | POST | `/v1/auth/refresh` | none | Swap a refresh token for a fresh access token |
 | GET | `/v1/auth/me` | Bearer token | Current user, incl. `is_anonymous` |
 | GET | `/v1/feed?limit=10&exclude=…` | Bearer token | Next cards: best-sellers until 3 likes, then personalised; each card carries its reason |
