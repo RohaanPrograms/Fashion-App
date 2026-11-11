@@ -6,7 +6,8 @@ import { API_BASE_URL } from "../config";
 
 // Shapes returned by the backend's /v1/auth endpoints.
 // These mirror the Pydantic models in backend/app/schemas/auth.py.
-export type UserOut = { id: string; email?: string | null };
+// is_anonymous: true for a guest (an account with no email yet).
+export type UserOut = { id: string; email?: string | null; is_anonymous: boolean };
 
 export type Session = {
   access_token: string;
@@ -107,4 +108,29 @@ export const api = {
     }),
 
   me: (token: string) => request<UserOut>("/v1/auth/me", { token }),
+
+  // Start a guest session: a real account with no email. The server allows
+  // 5 per network per hour, so the app saves and reuses the one it gets.
+  anonymous: () => request<AuthResponse>("/v1/auth/anonymous", { method: "POST" }),
+
+  // "Save your wardrobe", step 1: Supabase emails a one-time code to this address.
+  upgradeStart: (token: string, email: string) =>
+    request<{ email: string }>("/v1/auth/upgrade/start", {
+      method: "POST",
+      token,
+      body: { email },
+    }),
+
+  // Step 2: the code turns the guest into a normal account. Same account id,
+  // so every like and set is kept. Returns a fresh session.
+  upgradeVerify: (token: string, email: string, code: string) =>
+    request<AuthResponse>("/v1/auth/upgrade/verify", {
+      method: "POST",
+      token,
+      body: { email, code },
+    }),
+
+  // Step 3: give the now-verified account a password, so it can log in.
+  setPassword: (token: string, password: string) =>
+    request<null>("/v1/auth/password", { method: "POST", token, body: { password } }),
 };

@@ -3,7 +3,7 @@
 #
 # Two independent jobs run in parallel:
 #   backend  — installs Python deps and verifies the FastAPI app imports.
-#   mobile   — installs Node deps and type-checks the Expo app.
+#   mobile   — installs Node deps, type-checks the Expo app, runs its Jest tests.
 
 name: CI
 
@@ -64,3 +64,7 @@ jobs:
 
       - name: Type-check
         run: npx tsc --noEmit
+
+      # Pure app logic (session start-up, feed queue, set rules), no device needed.
+      - name: Run tests
+        run: npx jest --ci
