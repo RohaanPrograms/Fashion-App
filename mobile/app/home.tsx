@@ -1,23 +1,17 @@
-// Home screen: the first screen a logged-in user sees.
-// For Phase 0 this is a placeholder that proves auth works end to end.
-import { Pressable, Text, View } from "react-native";
+// Temporary landing screen until the tabs arrive: proves the guest flow works.
+import { Text, View } from "react-native";
 
 import { useAuth } from "../src/auth/AuthContext";
-import { colors, styles } from "../src/theme";
+import { AccountBanner } from "../src/components/AccountBanner";
+import { styles } from "../src/theme";
 
 export default function Home() {
-  const { user, signOut } = useAuth();
-
+  const { user } = useAuth();
   return (
     <View style={styles.screen}>
-      <Text style={styles.title}>You're in 🎉</Text>
-      <Text style={styles.subtitle}>
-        Logged in as {user?.email ?? user?.id}
-      </Text>
-
-      <Pressable style={styles.button} onPress={signOut}>
-        <Text style={styles.buttonText}>Log out</Text>
-      </Pressable>
+      <Text style={styles.title}>You're in</Text>
+      <Text style={styles.subtitle}>Account {user?.id}</Text>
+      <AccountBanner />
     </View>
   );
 }

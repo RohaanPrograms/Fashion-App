@@ -1,5 +1,7 @@
 // Login screen: email + password -> calls the backend, stores the token.
-import { Link } from "expo-router";
+// Optional: a visitor is never sent here on a first visit (they start as a
+// guest). It's reached after logging out, or from "Couldn't start".
+import { Link, useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -15,7 +17,8 @@ import { useAuth } from "../src/auth/AuthContext";
 import { colors, styles } from "../src/theme";
 
 export default function Login() {
-  const { signIn } = useAuth();
+  const { signIn, user, restoreOrStartGuest } = useAuth();
+  const router = useRouter();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,7 +32,7 @@ export default function Login() {
     setSubmitting(true);
     try {
       await signIn(email.trim(), password);
-      // On success the root layout redirects us to /home automatically.
+      router.replace("/"); // the first screen sends a signed-in user into the app
     } catch (e: any) {
       setError(e?.detail ?? "Something went wrong. Please try again.");
     } finally {
@@ -45,6 +48,12 @@ export default function Login() {
       <View style={styles.screen}>
         <Text style={styles.title}>Welcome back</Text>
         <Text style={styles.subtitle}>Log in to continue.</Text>
+        {user?.is_anonymous && (
+          <Text style={styles.info}>
+            Logging in switches to that account. This guest's likes stay with the
+            guest; to keep them, save your wardrobe with an email instead.
+          </Text>
+        )}
 
         <Text style={styles.label}>Email</Text>
         <TextInput
@@ -89,6 +98,18 @@ export default function Login() {
             Sign up
           </Link>
         </View>
+
+        {!user && (
+          <Pressable
+            style={styles.linkRow}
+            onPress={async () => {
+              await restoreOrStartGuest();
+              router.replace("/");
+            }}
+          >
+            <Text style={styles.link}>Continue as a guest</Text>
+          </Pressable>
+        )}
       </View>
     </KeyboardAvoidingView>
   );

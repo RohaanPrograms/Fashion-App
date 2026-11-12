@@ -39,8 +39,9 @@ export default function Signup() {
         setInfo(
           "Account created. Check your email to confirm your address, then log in."
         );
+        return;
       }
-      // If no confirmation is needed, the root layout redirects us to /home.
+      router.replace("/"); // the first screen sends a signed-in user into the app
     } catch (e: any) {
       setError(e?.detail ?? "Something went wrong. Please try again.");
     } finally {

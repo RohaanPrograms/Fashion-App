@@ -1,20 +1,26 @@
-// Holds the "who is logged in" state for the whole app.
+// Holds the "who is signed in" state for the whole app.
 //
 // React Context is a way to share one piece of state with every screen without
-// passing it down manually through props. Any screen can call `useAuth()` to
-// read the current user or trigger sign in / sign up / sign out.
+// passing it down manually through props. Any screen can call `useAuth()`.
 //
 // ---------------------------------------------------------------------------
-// Staying logged in past the first hour
+// Guest first
+// ---------------------------------------------------------------------------
+// A visitor never meets a signup wall. On startup the app reuses the session
+// saved on this device or, if there is none, quietly creates a GUEST: a real
+// account with no email. The decision lives in startup.ts as a pure, tested
+// function; this file only supplies the real storage and network calls.
+//
+// A guest can "save their wardrobe": confirm an email with an emailed code,
+// then set a password, on the SAME account, so every like and set is kept.
+//
+// ---------------------------------------------------------------------------
+// Staying signed in past the first hour
 // ---------------------------------------------------------------------------
 // Supabase hands out two tokens. The ACCESS token is sent on every request to
 // prove who you are, and it expires after about an hour on purpose — a stolen
 // one is only briefly useful. The REFRESH token is long-lived and does exactly
 // one job: trade itself in for a new access token.
-//
-// So instead of asking "is the user logged in?" we ask "do we have a usable
-// access token right now?" — and if it's about to expire, we quietly swap it
-// for a fresh one before the request goes out. The user never notices.
 //
 // Screens should never read the access token directly. Call `getValidToken()`,
 // which always returns one that is good to use.
@@ -37,24 +43,29 @@ import {
   type StoredSession,
   type UserOut,
 } from "../api/client";
+import { isNetworkError, needsRefresh, startSession, startupMessage } from "./startup";
 
 // Where the saved session lives on the device.
 const SESSION_KEY = "auth_session";
-// The old key, which stored a bare access token with no refresh token. Anyone
-// who used a build from before refresh existed still has one lying around.
+// The old key, which stored a bare access token with no refresh token.
 const LEGACY_TOKEN_KEY = "access_token";
-
-// Refresh this long before the token actually expires. Without a margin, a
-// token could pass the "still valid" check and then die while the request is
-// in flight over a slow connection.
-const REFRESH_MARGIN_MS = 60_000;
 
 type AuthContextValue = {
   user: UserOut | null;
-  // true while we check the device for a saved session at startup
+  // true while the app is finding or creating a session
   loading: boolean;
+  /** Why the app couldn't start a session (offline, guest limit…), or null. */
+  startupError: string | null;
+  /** Reuse the saved session, or start a new guest. Also "Try again". */
+  restoreOrStartGuest: () => Promise<void>;
   signUp: (email: string, password: string) => Promise<{ needsEmailConfirm: boolean }>;
   signIn: (email: string, password: string) => Promise<void>;
+  /** Save your wardrobe, step 1: email a code to this address. */
+  startUpgrade: (email: string) => Promise<void>;
+  /** Step 2: the code makes this guest a normal account (same id, everything kept). */
+  confirmUpgrade: (email: string, code: string) => Promise<void>;
+  /** Step 3, retry-able on its own: set the verified account's password. */
+  setPassword: (password: string) => Promise<void>;
   signOut: () => Promise<void>;
   /** An access token guaranteed to still be valid — refreshing first if needed. */
   getValidToken: () => Promise<string>;
@@ -62,16 +73,10 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-// A network failure (no wifi, backend down) is not the same as a rejected
-// token. The first should leave the user signed in to retry later; only the
-// second means the session is genuinely dead.
-function isNetworkError(err: unknown): boolean {
-  return (err as ApiError)?.status === 0;
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserOut | null>(null);
   const [loading, setLoading] = useState(true);
+  const [startupError, setStartupError] = useState<string | null>(null);
 
   // The session lives in a ref, not state, because async code below needs to
   // read the CURRENT value. A state variable captured inside an async function
@@ -79,8 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const sessionRef = useRef<StoredSession | null>(null);
 
   // If three screens all ask for a token at the same moment on a stale
-  // session, we want one refresh call, not three. Everyone waits on the same
-  // in-flight promise.
+  // session, we want one refresh call, not three.
   const refreshInFlight = useRef<Promise<StoredSession> | null>(null);
 
   async function storeSession(session: StoredSession) {
@@ -111,9 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await storeSession(next);
         return next;
       } catch (err) {
-        // Backend rejected the refresh token (expired, or signed out
-        // elsewhere) — the session is really over. A network blip is not,
-        // so leave that session intact and let the caller retry.
+        // Backend rejected the refresh token: the session is really over.
+        // A network blip is not, so leave that session intact.
         if (!isNetworkError(err)) await clearSession();
         throw err;
       } finally {
@@ -128,36 +131,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function getValidToken(): Promise<string> {
     const current = sessionRef.current;
     if (!current) throw { status: 401, detail: "Not signed in." } as ApiError;
-
-    if (Date.now() < current.expires_at - REFRESH_MARGIN_MS) {
-      return current.access_token;
-    }
+    if (!needsRefresh(current, Date.now())) return current.access_token;
     const refreshed = await refreshSession();
     return refreshed.access_token;
   }
 
-  // On app startup: look for a saved session, renew it if the access token
-  // went stale while the app was closed, and log the user straight back in.
-  useEffect(() => {
-    (async () => {
-      try {
-        // Builds from before refresh existed saved a bare access token. There
-        // is no refresh token to rescue it with, so drop it and require a
-        // fresh login once.
-        await AsyncStorage.removeItem(LEGACY_TOKEN_KEY);
-
-        const raw = await AsyncStorage.getItem(SESSION_KEY);
-        if (raw) {
-          sessionRef.current = JSON.parse(raw) as StoredSession;
-          const token = await getValidToken(); // refreshes if it expired
-          setUser(await api.me(token));
-        }
-      } catch {
-        await clearSession(); // unreadable or rejected — start clean
-      } finally {
-        setLoading(false);
+  async function restoreOrStartGuest() {
+    setLoading(true);
+    setStartupError(null);
+    try {
+      await AsyncStorage.removeItem(LEGACY_TOKEN_KEY);
+      const result = await startSession({
+        now: Date.now,
+        loadSaved: async () => {
+          const raw = await AsyncStorage.getItem(SESSION_KEY);
+          return raw ? (JSON.parse(raw) as StoredSession) : null;
+        },
+        save: storeSession,
+        clear: clearSession,
+        refresh: api.refresh,
+        me: api.me,
+        createGuest: api.anonymous,
+      });
+      if (result.kind === "ready") {
+        sessionRef.current = result.session;
+        setUser(result.user);
+      } else {
+        setStartupError(startupMessage(result.error));
       }
-    })();
+    } catch {
+      setStartupError("Something went wrong starting the app. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // On app startup: reuse this device's session, or start a guest.
+  useEffect(() => {
+    void restoreOrStartGuest();
   }, []);
 
   // Coming back to a backgrounded app is the moment a token is most likely to
@@ -166,10 +177,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const subscription = AppState.addEventListener("change", (state) => {
       if (state !== "active") return;
       const current = sessionRef.current;
-      if (!current) return;
-      if (Date.now() >= current.expires_at - REFRESH_MARGIN_MS) {
-        // Failures are already handled inside refreshSession (it signs the
-        // user out on a rejected token); nothing to do here but not crash.
+      if (current && needsRefresh(current, Date.now())) {
+        // Failures are handled inside refreshSession; just don't crash.
         refreshSession().catch(() => {});
       }
     });
@@ -184,8 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signUp(email: string, password: string) {
     const res = await api.signup(email, password);
     const session = toStoredSession(res);
-    // If Supabase has "confirm email" turned on, no session is returned yet —
-    // the user must click a link in their email before they can log in.
+    // If Supabase has "confirm email" turned on, no session is returned yet.
     if (!session) return { needsEmailConfirm: true };
     await adoptSession(session);
     return { needsEmailConfirm: false };
@@ -200,13 +208,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await adoptSession(session);
   }
 
+  async function startUpgrade(email: string) {
+    await api.upgradeStart(await getValidToken(), email);
+  }
+
+  async function confirmUpgrade(email: string, code: string) {
+    const res = await api.upgradeVerify(await getValidToken(), email, code);
+    const session = toStoredSession(res);
+    if (!session) {
+      throw { status: 503, detail: "Confirming the code returned no session." } as ApiError;
+    }
+    // A fresh token that no longer says "guest". Same account id.
+    await storeSession(session);
+    setUser(res.user);
+  }
+
+  async function setPassword(password: string) {
+    await api.setPassword(await getValidToken(), password);
+  }
+
   async function signOut() {
     await clearSession();
   }
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, signUp, signIn, signOut, getValidToken }}
+      value={{
+        user,
+        loading,
+        startupError,
+        restoreOrStartGuest,
+        signUp,
+        signIn,
+        startUpgrade,
+        confirmUpgrade,
+        setPassword,
+        signOut,
+        getValidToken,
+      }}
     >
       {children}
     </AuthContext.Provider>
