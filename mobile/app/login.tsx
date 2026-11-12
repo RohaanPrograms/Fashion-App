@@ -1,7 +1,7 @@
 // Login screen: email + password -> calls the backend, stores the token.
 // Optional: a visitor is never sent here on a first visit (they start as a
 // guest). It's reached after logging out, or from "Couldn't start".
-import { Link, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -17,7 +17,7 @@ import { useAuth } from "../src/auth/AuthContext";
 import { colors, styles } from "../src/theme";
 
 export default function Login() {
-  const { signIn, user, restoreOrStartGuest } = useAuth();
+  const { signIn, user, continueAsGuest } = useAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -92,18 +92,29 @@ export default function Login() {
           )}
         </Pressable>
 
-        <View style={styles.linkRow}>
-          <Text style={styles.linkText}>Don't have an account? </Text>
-          <Link href="/signup" style={styles.link}>
-            Sign up
-          </Link>
-        </View>
+        {(!user || user.is_anonymous) && (
+          // There is one way to make an account: start as a guest (if not one
+          // already) and "save your wardrobe" with an emailed code + password.
+          // Anything liked before saving is kept.
+          <View style={styles.linkRow}>
+            <Text style={styles.linkText}>Don't have an account? </Text>
+            <Pressable
+              accessibilityRole="link"
+              onPress={async () => {
+                if (!user) await continueAsGuest();
+                router.push("/save");
+              }}
+            >
+              <Text style={styles.link}>Sign up</Text>
+            </Pressable>
+          </View>
+        )}
 
         {!user && (
           <Pressable
             style={styles.linkRow}
             onPress={async () => {
-              await restoreOrStartGuest();
+              await continueAsGuest();
               router.replace("/");
             }}
           >

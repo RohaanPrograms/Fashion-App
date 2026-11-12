@@ -7,6 +7,11 @@
 // which works out where they should be.
 //
 // Guests count as signed in: they have a real (email-less) account.
+//
+// While the saved session is still being checked (`loading`), the gate stays
+// OPEN. Otherwise a reload on /wardrobe would see "no user yet", be sent to
+// "/", and land on the feed. The tab layout shows a spinner during that check
+// so no screen loads data before we know who the visitor is.
 
 import { Stack } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -14,15 +19,14 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "../src/auth/AuthContext";
 
 function RootNavigator() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="login" />
-      <Stack.Screen name="signup" />
-      <Stack.Protected guard={!!user}>
-        <Stack.Screen name="home" />
+      <Stack.Protected guard={loading || !!user}>
+        <Stack.Screen name="(tabs)" />
         <Stack.Screen name="save" />
       </Stack.Protected>
     </Stack>

@@ -89,6 +89,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 }
 
 export const api = {
+  // Not used by the app at the moment: accounts are made by "saving" a guest
+  // (upgradeStart/upgradeVerify below). Kept because a traditional
+  // confirm-by-link sign-up may come back once the web app has a public
+  // address.
   signup: (email: string, password: string) =>
     request<AuthResponse>("/v1/auth/signup", {
       method: "POST",

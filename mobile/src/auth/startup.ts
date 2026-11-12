@@ -4,6 +4,9 @@
 //    token has expired). This is the common case: a returning visitor.
 // 2. If there is none, or the server says the saved one is dead, a new guest
 //    account is created and saved.
+//    Exception: if the visitor logged out on purpose on this device, no guest
+//    is made; they go to the login screen (which offers "Continue as a
+//    guest"). Otherwise every reload after a log-out would make a new guest.
 // 3. If the server can't be reached, or is having trouble, NOTHING is thrown
 //    away and no guest is created: the screen offers "Try again". Creating a
 //    guest on every failed launch would burn through the server's limit of
@@ -35,10 +38,13 @@ export type StartupDeps = {
   refresh: (refreshToken: string) => Promise<AuthResponse>;
   me: (accessToken: string) => Promise<UserOut>;
   createGuest: () => Promise<AuthResponse>;
+  /** Did the visitor tap "Log out" on this device (and not sign in since)? */
+  wasSignedOut: () => Promise<boolean>;
 };
 
 export type StartupResult =
   | { kind: "ready"; session: StoredSession; user: UserOut; isNewGuest: boolean }
+  | { kind: "signed-out" }
   | { kind: "failed"; error: ApiError };
 
 // A network failure (no wifi, server down) is not the same as a rejected
@@ -86,6 +92,8 @@ export async function startSession(deps: StartupDeps): Promise<StartupResult> {
       await deps.clear(); // the server said this session is over
     }
   }
+
+  if (await deps.wasSignedOut()) return { kind: "signed-out" };
 
   try {
     const res = await deps.createGuest();

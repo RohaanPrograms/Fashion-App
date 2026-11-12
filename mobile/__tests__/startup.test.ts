@@ -29,6 +29,7 @@ function fakeDeps(overrides: Partial<StartupDeps> = {}): StartupDeps {
     refresh: jest.fn(async (_t: string) => authResponse(MEMBER, "refreshed-access")),
     me: jest.fn(async (_t: string) => MEMBER),
     createGuest: jest.fn(async () => authResponse(GUEST, "guest-access")),
+    wasSignedOut: jest.fn(async () => false),
     ...overrides,
   };
 }
@@ -143,6 +144,26 @@ test("a guest sign-in without a session is a failure, not a crash", async () => 
 
   expect(result).toMatchObject({ kind: "failed", error: { status: 503 } });
   expect(deps.save).not.toHaveBeenCalled();
+});
+
+test("after a deliberate log-out, no guest is created: the visitor goes to login", async () => {
+  const deps = fakeDeps({ wasSignedOut: jest.fn(async () => true) });
+
+  const result = await startSession(deps);
+
+  expect(result).toEqual({ kind: "signed-out" });
+  expect(deps.createGuest).not.toHaveBeenCalled();
+});
+
+test("a saved session is used even if an old log-out note is still there", async () => {
+  const deps = fakeDeps({
+    loadSaved: jest.fn(async () => saved(30 * 60_000)),
+    wasSignedOut: jest.fn(async () => true),
+  });
+
+  const result = await startSession(deps);
+
+  expect(result).toMatchObject({ kind: "ready", user: MEMBER });
 });
 
 test("needsRefresh starts 60 s before expiry", () => {

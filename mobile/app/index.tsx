@@ -20,7 +20,7 @@ export default function Index() {
       </View>
     );
   }
-  if (user) return <Redirect href="/home" />;
+  if (user) return <Redirect href="/feed" />;
   if (startupError) {
     return (
       <View style={styles.screen}>

@@ -49,6 +49,10 @@ import { isNetworkError, needsRefresh, startSession, startupMessage } from "./st
 const SESSION_KEY = "auth_session";
 // The old key, which stored a bare access token with no refresh token.
 const LEGACY_TOKEN_KEY = "access_token";
+// A note that the visitor tapped "Log out" here. While it's set, startup sends
+// them to the login screen instead of quietly creating a new guest. Cleared as
+// soon as any session is saved (log in, sign up, or "Continue as a guest").
+const SIGNED_OUT_KEY = "signed_out_on_purpose";
 
 type AuthContextValue = {
   user: UserOut | null;
@@ -58,7 +62,8 @@ type AuthContextValue = {
   startupError: string | null;
   /** Reuse the saved session, or start a new guest. Also "Try again". */
   restoreOrStartGuest: () => Promise<void>;
-  signUp: (email: string, password: string) => Promise<{ needsEmailConfirm: boolean }>;
+  /** The login screen's "Continue as a guest": forget the log-out, start a guest. */
+  continueAsGuest: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   /** Save your wardrobe, step 1: email a code to this address. */
   startUpgrade: (email: string) => Promise<void>;
@@ -90,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function storeSession(session: StoredSession) {
     sessionRef.current = session;
     await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    await AsyncStorage.removeItem(SIGNED_OUT_KEY); // signed in again: forget the log-out
   }
 
   async function clearSession() {
@@ -152,13 +158,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refresh: api.refresh,
         me: api.me,
         createGuest: api.anonymous,
+        wasSignedOut: async () => (await AsyncStorage.getItem(SIGNED_OUT_KEY)) === "1",
       });
       if (result.kind === "ready") {
         sessionRef.current = result.session;
         setUser(result.user);
-      } else {
+      } else if (result.kind === "failed") {
         setStartupError(startupMessage(result.error));
       }
+      // "signed-out": no user and no error, so the first screen shows login.
     } catch {
       setStartupError("Something went wrong starting the app. Try again.");
     } finally {
@@ -190,15 +198,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(await api.me(session.access_token));
   }
 
-  async function signUp(email: string, password: string) {
-    const res = await api.signup(email, password);
-    const session = toStoredSession(res);
-    // If Supabase has "confirm email" turned on, no session is returned yet.
-    if (!session) return { needsEmailConfirm: true };
-    await adoptSession(session);
-    return { needsEmailConfirm: false };
-  }
-
   async function signIn(email: string, password: string) {
     const res = await api.login(email, password);
     const session = toStoredSession(res);
@@ -227,8 +226,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await api.setPassword(await getValidToken(), password);
   }
 
+  async function continueAsGuest() {
+    await AsyncStorage.removeItem(SIGNED_OUT_KEY);
+    await restoreOrStartGuest();
+  }
+
   async function signOut() {
     await clearSession();
+    await AsyncStorage.setItem(SIGNED_OUT_KEY, "1");
   }
 
   return (
@@ -238,7 +243,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         startupError,
         restoreOrStartGuest,
-        signUp,
+        continueAsGuest,
         signIn,
         startUpgrade,
         confirmUpgrade,
