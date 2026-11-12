@@ -18,6 +18,37 @@ export type Session = {
 
 export type AuthResponse = { user: UserOut; session: Session | null };
 
+// Shapes returned by /v1/feed and friends. They mirror backend/app/schemas/
+// products.py and feed.py.
+export type Product = {
+  id: string;
+  name: string;
+  brand: string | null;
+  price: number | null;
+  currency: string;
+  image_url: string | null;
+  category: string | null;
+  colour: string | null;
+};
+
+// Why a card was picked. "popular": a best-seller (before 3 likes).
+// "similar": close to your taste; because_of is the liked item it's nearest
+// to. "explore": a deliberate wildcard from your top 100.
+export type Reason = {
+  kind: "popular" | "similar" | "explore";
+  similarity: number | null;
+  because_of: { id: string; name: string } | null;
+};
+
+export type FeedItem = { product: Product; reason: Reason };
+
+export type FeedResponse = {
+  personalised: boolean;
+  likes: number;
+  likes_needed: number;
+  items: FeedItem[];
+};
+
 // What we actually keep on the device between app launches.
 //
 // `expires_at` is the wall-clock time (epoch milliseconds) at which the access
@@ -132,6 +163,22 @@ export const api = {
       method: "POST",
       token,
       body: { email, code },
+    }),
+
+  // The next 10 cards. `exclude` = cards the server can't know we already
+  // have (on screen, waiting, or swiped but not yet saved). Max 50.
+  feed: (token: string, exclude: string[] = []) =>
+    request<FeedResponse>(
+      `/v1/feed?limit=10${exclude.map((id) => `&exclude=${encodeURIComponent(id)}`).join("")}`,
+      { token }
+    ),
+
+  // Record a swipe. A like also puts the garment in the wardrobe.
+  interact: (token: string, productId: string, type: "like" | "dislike") =>
+    request<unknown>("/v1/interactions", {
+      method: "POST",
+      token,
+      body: { product_id: productId, type },
     }),
 
   // Step 3: give the now-verified account a password, so it can log in.
