@@ -5,8 +5,9 @@
 import { Image } from "expo-image";
 import { useEffect, useRef, useState } from "react";
 
-import { api, type ApiError, type FeedItem } from "../api/client";
+import { api, type ApiError, type CategoryOption, type FeedItem } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { NO_PICKS, samePicks, type Picks } from "./filters";
 import { afterLike, mergeProgress, progressFrom, type Progress } from "./progress";
 import {
   advance,
@@ -20,7 +21,8 @@ import {
   type FeedQueue,
 } from "./queue";
 
-// reset: start from scratch. append: the prefetch. replace: the personalised switch.
+// reset: start from scratch (also when the filter changes). append: the
+// prefetch. replace: the personalised switch.
 type LoadMode = "reset" | "append" | "replace";
 
 function message(err: unknown): string {
@@ -37,11 +39,16 @@ export function useFeed() {
   const [queue, setQueueState] = useState<FeedQueue>(emptyQueue);
   const [progress, setProgressState] = useState<Progress | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilterState] = useState<Picks>(NO_PICKS);
+  // The filter buttons. Empty until the server answers; if it never does,
+  // the feed simply shows no buttons.
+  const [options, setOptions] = useState<CategoryOption[]>([]);
 
   // Refs hold the CURRENT values for async code: state captured inside an
   // async function is frozen at the moment it started.
   const queueRef = useRef(queue);
   const progressRef = useRef<Progress | null>(null);
+  const filterRef = useRef<Picks>(NO_PICKS);
   const appending = useRef(false);
   // Bumped by reset and replace. A reply that started before the bump is
   // stale (it would put old best-sellers back) and is ignored.
@@ -67,19 +74,21 @@ export function useFeed() {
     try {
       const token = await getValidToken();
       const q = queueRef.current;
+      // A reset still skips swipes on their way to the server: a filter
+      // change can happen a split second after a swipe.
       const exclude =
-        mode === "reset" ? [] : mode === "replace" ? excludeIdsForReplace(q, pending.current) : excludeIds(q, pending.current);
-      const res = await api.feed(token, exclude);
+        mode === "reset"
+          ? excludeIdsForReplace(emptyQueue, pending.current)
+          : mode === "replace"
+            ? excludeIdsForReplace(q, pending.current)
+            : excludeIds(q, pending.current);
+      const res = await api.feed(token, exclude, filterRef.current);
       if (mine !== generation.current) return;
 
       const latest = queueRef.current;
-      if (mode === "reset") {
-        setQueue(appendBatch(emptyQueue, res.items));
-        setProgress(progressFrom(res));
-      } else {
-        setQueue(mode === "append" ? appendBatch(latest, res.items) : replaceUpcoming(latest, res.items));
-        setProgress(mergeProgress(progressRef.current, progressFrom(res)));
-      }
+      if (mode === "reset") setQueue(appendBatch(emptyQueue, res.items));
+      else setQueue(mode === "append" ? appendBatch(latest, res.items) : replaceUpcoming(latest, res.items));
+      setProgress(mergeProgress(progressRef.current, progressFrom(res)));
       prefetchPhotos(res.items.slice(0, 3));
       setError(null);
     } catch (err) {
@@ -125,8 +134,23 @@ export function useFeed() {
     void load("reset");
   }
 
+  // A new filter: drop the waiting cards and fetch ones that match. The
+  // like count carries over; likes count toward your taste whatever the filter.
+  function setFilter(next: Picks) {
+    if (samePicks(next, filterRef.current)) return;
+    filterRef.current = next;
+    setFilterState(next);
+    setQueue(emptyQueue);
+    setError(null);
+    void load("reset");
+  }
+
   useEffect(() => {
     void load("reset");
+    api
+      .filters()
+      .then(setOptions)
+      .catch(() => {}); // no buttons is fine; the feed still works
   }, []);
 
   return {
@@ -134,6 +158,9 @@ export function useFeed() {
     progress,
     error,
     exhausted: queue.exhausted && currentCard(queue) === null,
+    filter,
+    options,
+    setFilter,
     swipe,
     retry: () => void load(queue.items.length ? "append" : "reset"),
     reset,

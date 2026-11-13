@@ -11,6 +11,8 @@ def _record(**overrides) -> dict:
         "garment_group_name": "Trousers",
         "department_name": "Trousers",
         "graphical_appearance_name": "Solid",
+        "product_type_name": "Trousers",
+        "detail_desc": "High-waisted jeans in washed superstretch denim.",
         "popularity": 10903,
     }
     record.update(overrides)
@@ -53,6 +55,8 @@ def test_builds_a_row_matching_the_products_table():
     assert row["image_url"].endswith("/product-images/0706016001.webp")
     assert row["url"] == "https://www2.hm.com/en_gb/productpage.0706016001.html"
     assert row["attributes"]["colour"] == "Black"
+    assert row["attributes"]["type"] == "Trousers"
+    assert row["attributes"]["description"] == "High-waisted jeans in washed superstretch denim."
     # The database client sends JSON; numpy integers are not JSON-serialisable.
     assert type(row["popularity"]) is int
 

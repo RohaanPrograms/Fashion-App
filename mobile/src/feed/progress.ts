@@ -7,8 +7,13 @@ import type { FeedResponse } from "../api/client";
 
 export type Progress = { personalised: boolean; likes: number; likesNeeded: number };
 
+/** The server's likes_needed is the TOTAL it takes (3), not how many are left. */
 export function progressFrom(res: FeedResponse): Progress {
-  return { personalised: res.personalised, likes: res.likes, likesNeeded: res.likes_needed };
+  return {
+    personalised: res.personalised,
+    likes: res.likes,
+    likesNeeded: res.personalised ? 0 : Math.max(0, res.likes_needed - res.likes),
+  };
 }
 
 /** A reply fetched before the latest likes were saved must not undo them. */

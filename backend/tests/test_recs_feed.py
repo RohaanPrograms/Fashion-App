@@ -31,13 +31,13 @@ def test_cold_start_shows_best_sellers_one_colour_per_design(small_catalog, ids)
     assert all(item.reason.because_of is None for item in feed.items)
 
 
-def test_cold_start_never_shows_what_was_already_swiped(small_catalog, ids):
+def test_cold_start_never_shows_what_was_already_swiped_in_any_colour(small_catalog, ids):
     feed = build_feed(
         small_catalog, _history(likes=[ids["black_tee"]]), limit=2, rng=np.random.default_rng(0)
     )
 
-    # black_tee is hidden; its other colour can still represent design T1
-    assert _names(feed, ids) == ["white_tee", "jeans"]
+    # black_tee is hidden, and so is white_tee: the same design in another colour
+    assert _names(feed, ids) == ["jeans", "dress"]
 
 
 def test_personalises_from_the_shared_constant(small_catalog, ids, monkeypatch):
@@ -142,3 +142,71 @@ def test_hidden_garments_never_appear_and_designs_never_repeat(make_catalog, see
     assert len(shown) == len(set(shown)) <= 10
     codes = [item.product.product_code for item in feed.items]
     assert len(codes) == len(set(codes))
+
+
+def test_a_category_filter_keeps_only_that_category(small_catalog, ids):
+    from app.recs.filters import parse_pick
+
+    keep = small_catalog.matching(parse_pick("shoes"))
+    feed = build_feed(small_catalog, _history(), limit=10, rng=np.random.default_rng(0), keeps=[keep])
+
+    assert _names(feed, ids) == ["heels", "sneakers"]  # best-sellers among shoes
+
+
+def test_a_filtered_feed_is_still_ranked_by_taste(small_catalog, ids):
+    from app.recs.filters import parse_pick
+
+    keep = small_catalog.matching(parse_pick("tops"))
+    history = _history(likes=[ids["dress"], ids["heels"], ids["belt"]])
+    feed = build_feed(small_catalog, history, limit=2, rng=np.random.default_rng(0), keeps=[keep])
+
+    # Best-sellers would put black_tee first; this user's style ranks
+    # striped_tee (0.443) above white_tee (0.287) above black_tee (0.238).
+    assert feed.personalised
+    assert _names(feed, ids) == ["striped_tee", "white_tee"]
+
+
+def test_a_type_filter_narrows_further(small_catalog, ids):
+    from app.recs.filters import parse_pick
+
+    keep = small_catalog.matching(parse_pick("bottoms:trousers"))
+    feed = build_feed(small_catalog, _history(), limit=10, rng=np.random.default_rng(0), keeps=[keep])
+
+    assert _names(feed, ids) == ["jeans"]
+
+
+def test_disliking_one_colour_hides_the_others(small_catalog, ids):
+    feed = build_feed(
+        small_catalog, _history(dislikes=[ids["white_tee"]]), limit=10, rng=np.random.default_rng(0)
+    )
+
+    assert "black_tee" not in _names(feed, ids)
+
+
+def _keeps(catalog, *picks):
+    from app.recs.filters import parse_pick
+
+    return [catalog.matching(parse_pick(p)) for p in picks]
+
+
+def test_several_picks_take_turns(small_catalog, ids):
+    keeps = _keeps(small_catalog, "tops:t-shirts", "shoes")
+    feed = build_feed(small_catalog, _history(), limit=4, rng=np.random.default_rng(0), keeps=keeps)
+
+    # Best-sellers within each pick, alternating: tee, shoe, tee, shoe
+    assert _names(feed, ids) == ["black_tee", "heels", "striped_tee", "sneakers"]
+
+
+def test_a_pick_that_runs_dry_hands_its_share_to_the_others(small_catalog, ids):
+    keeps = _keeps(small_catalog, "bottoms:trousers", "tops")
+    feed = build_feed(small_catalog, _history(), limit=3, rng=np.random.default_rng(0), keeps=keeps)
+
+    # Trousers has only the jeans; tops fills the rest of the batch.
+    assert _names(feed, ids) == ["jeans", "black_tee", "striped_tee"]
+
+
+def test_overlapping_picks_never_show_a_card_twice(small_catalog, ids):
+    keeps = _keeps(small_catalog, "tops", "tops:t-shirts")
+    feed = build_feed(small_catalog, _history(), limit=4, rng=np.random.default_rng(0), keeps=keeps)
+
+    assert _names(feed, ids) == ["black_tee", "striped_tee"]

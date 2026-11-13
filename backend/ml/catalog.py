@@ -63,5 +63,9 @@ def build_product_row(record: dict, base_url: str, bucket: str) -> dict:
             "garment_group": _text(record.get("garment_group_name")),
             "department": _text(record.get("department_name")),
             "appearance": _text(record.get("graphical_appearance_name")),
+            # The garment type ("Vest top", "Trousers"): what the feed filters
+            # by, and what the card's details panel calls the piece.
+            "type": _text(record.get("product_type_name")),
+            "description": _text(record.get("detail_desc")),
         },
     }

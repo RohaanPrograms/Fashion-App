@@ -1,10 +1,12 @@
 // The swipe feed: one card at a time, ✕ or ♡. Every ♡ also lands in the
-// wardrobe. The line at the top shows whether the feed is still best-sellers
-// or already personalised to your likes.
+// wardrobe. At the top: the filter buttons, then a line saying whether the
+// feed is still best-sellers or already personalised to your likes.
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { FilterBar } from "../../src/components/FilterBar";
 import { ProductCard } from "../../src/components/ProductCard";
+import { exhaustedMessage } from "../../src/feed/filters";
 import { progressLabel } from "../../src/feed/progress";
 import { useFeed } from "../../src/feed/useFeed";
 import { colors, styles } from "../../src/theme";
@@ -24,7 +26,7 @@ export default function Feed() {
       />
     );
   } else if (feed.exhausted) {
-    body = <Text style={styles.subtitle}>You've seen the whole catalogue. Start over from the Wardrobe tab.</Text>;
+    body = <Text style={styles.subtitle}>{exhaustedMessage(feed.filter, feed.options)}</Text>;
   } else if (feed.error) {
     body = (
       <Pressable style={styles.button} onPress={feed.retry}>
@@ -37,6 +39,7 @@ export default function Feed() {
 
   return (
     <SafeAreaView style={local.screen} edges={["top"]}>
+      <FilterBar options={feed.options} picks={feed.filter} onChange={feed.setFilter} />
       <Text style={local.progress}>{progressLabel(feed.progress)}</Text>
       {feed.error && <Text style={styles.error}>{feed.error}</Text>}
       <View style={local.body}>{body}</View>

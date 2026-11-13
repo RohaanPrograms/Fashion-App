@@ -318,6 +318,14 @@ _SMALL = {
 }
 
 
+# H&M garment types (attributes.type), for the feed's filters.
+_SMALL_TYPES = {
+    "black_tee": "T-shirt", "white_tee": "T-shirt", "striped_tee": "T-shirt",
+    "jeans": "Trousers", "dress": "Dress", "heels": "Heels",
+    "sneakers": "Sneakers", "belt": "Belt",
+}
+
+
 @pytest.fixture
 def ids() -> dict[str, str]:
     """Product UUIDs of the small catalogue, by readable name."""
@@ -344,7 +352,9 @@ def small_catalog(ids):
 
     products, vectors = [], []
     for name, (category, code, popularity, price, vector) in _SMALL.items():
-        products.append(product_row(ids[name], name, category, code, popularity, price))
+        row = product_row(ids[name], name, category, code, popularity, price)
+        row["attributes"]["type"] = _SMALL_TYPES[name]
+        products.append(row)
         vectors.append({"product_id": ids[name], "vector": vector, "model_version": "als-2f-v1"})
     return build_catalog(products, vectors)
 

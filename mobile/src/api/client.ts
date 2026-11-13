@@ -3,6 +3,7 @@
 // headers live in one place.
 
 import { API_BASE_URL } from "../config";
+import { filterQuery, type Picks } from "../feed/filters";
 
 // Shapes returned by the backend's /v1/auth endpoints.
 // These mirror the Pydantic models in backend/app/schemas/auth.py.
@@ -41,6 +42,10 @@ export type Reason = {
 };
 
 export type FeedItem = { product: Product; reason: Reason };
+
+// The buttons above the feed, from GET /v1/feed/filters (backend/app/recs/filters.py).
+export type TypeOption = { key: string; label: string };
+export type CategoryOption = { key: string; label: string; types: TypeOption[] };
 
 export type FeedResponse = {
   personalised: boolean;
@@ -167,11 +172,15 @@ export const api = {
 
   // The next 10 cards. `exclude` = cards the server can't know we already
   // have (on screen, waiting, or swiped but not yet saved). Max 50.
-  feed: (token: string, exclude: string[] = []) =>
+  // `picks` narrows them to some categories / garment types, taking turns.
+  feed: (token: string, exclude: string[] = [], picks: Picks = []) =>
     request<FeedResponse>(
-      `/v1/feed?limit=10${exclude.map((id) => `&exclude=${encodeURIComponent(id)}`).join("")}`,
+      `/v1/feed?limit=10${exclude.map((id) => `&exclude=${encodeURIComponent(id)}`).join("")}${filterQuery(picks)}`,
       { token }
     ),
+
+  // The categories and garment types the feed can be filtered by. Public.
+  filters: () => request<CategoryOption[]>("/v1/feed/filters"),
 
   // Record a swipe. A like also puts the garment in the wardrobe.
   interact: (token: string, productId: string, type: "like" | "dislike") =>

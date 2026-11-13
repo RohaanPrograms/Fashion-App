@@ -5,9 +5,19 @@ import { afterLike, mergeProgress, progressFrom, progressLabel } from "../src/fe
 
 const cold = { personalised: false, likes: 0, likesNeeded: 3 };
 
-test("progressFrom reads the server's numbers", () => {
-  const res: FeedResponse = { personalised: false, likes: 1, likes_needed: 2, items: [] };
+test("progressFrom works out how many likes are left (the server sends the total)", () => {
+  const res: FeedResponse = { personalised: false, likes: 1, likes_needed: 3, items: [] };
   expect(progressFrom(res)).toEqual({ personalised: false, likes: 1, likesNeeded: 2 });
+});
+
+test("a guest who reloads with 2 likes is told 1 more, not 3", () => {
+  const res: FeedResponse = { personalised: false, likes: 2, likes_needed: 3, items: [] };
+  expect(progressLabel(progressFrom(res))).toBe("Best-sellers for now · like 1 more to personalise");
+});
+
+test("a personalised feed needs no more likes", () => {
+  const res: FeedResponse = { personalised: true, likes: 7, likes_needed: 3, items: [] };
+  expect(progressFrom(res)).toEqual({ personalised: true, likes: 7, likesNeeded: 0 });
 });
 
 test("the third like switches the feed, exactly once", () => {

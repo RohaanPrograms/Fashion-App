@@ -3,6 +3,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from app.recs.feed import Feed
+from app.recs.filters import CategoryFilter
 from app.schemas.products import ProductOut
 
 
@@ -47,4 +48,23 @@ class FeedOut(BaseModel):
                 )
                 for item in feed.items
             ],
+        )
+
+
+class TypeFilterOut(BaseModel):
+    key: str
+    label: str
+
+
+class FilterOut(BaseModel):
+    key: str
+    label: str
+    types: list[TypeFilterOut]
+
+    @classmethod
+    def of(cls, category: CategoryFilter) -> "FilterOut":
+        return cls(
+            key=category.key,
+            label=category.label,
+            types=[TypeFilterOut(key=t.key, label=t.label) for t in category.types],
         )

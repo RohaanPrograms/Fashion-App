@@ -20,11 +20,15 @@ import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from app.core.supabase_client import get_service_client
 from ml.paging import fetch_all_pages
+
+if TYPE_CHECKING:
+    from app.recs.filters import Selection
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +56,7 @@ class Product:
     product_code: str | None
     popularity: int
     colour: str | None
+    product_type: str | None = None  # "Vest top", "Trousers": what the filters use
 
 
 @dataclass(frozen=True)
@@ -62,6 +67,8 @@ class Catalog:
     unit: np.ndarray = field(init=False, repr=False)  # rows scaled to length 1
     groups: list[str | None] = field(init=False, repr=False)  # product_code per row
     popularity: np.ndarray = field(init=False, repr=False)
+    _category: np.ndarray = field(init=False, repr=False)  # per row, for filtering
+    _type: np.ndarray = field(init=False, repr=False)
     _positions: dict[str, int] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -78,6 +85,12 @@ class Catalog:
         object.__setattr__(
             self, "_positions", {p.id: i for i, p in enumerate(self.products)}
         )
+        object.__setattr__(
+            self, "_category", np.array([p.category or "" for p in self.products], dtype=object)
+        )
+        object.__setattr__(
+            self, "_type", np.array([p.product_type or "" for p in self.products], dtype=object)
+        )
 
     def __len__(self) -> int:
         return len(self.products)
@@ -88,6 +101,13 @@ class Catalog:
     def product(self, product_id: str) -> Product | None:
         position = self.position(product_id)
         return None if position is None else self.products[position]
+
+    def matching(self, selection: Selection) -> np.ndarray:
+        """True for every row the filter keeps: one boolean per product."""
+        keep = self._category == selection.product_group
+        if selection.types is not None:
+            keep &= np.isin(self._type, list(selection.types))
+        return keep
 
 
 def _product(row: dict) -> Product:
@@ -104,6 +124,7 @@ def _product(row: dict) -> Product:
         product_code=row.get("product_code"),
         popularity=int(row.get("popularity") or 0),
         colour=attributes.get("colour"),
+        product_type=attributes.get("type"),
     )
 
 

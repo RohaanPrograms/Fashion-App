@@ -26,7 +26,7 @@ export function ProductCard({ product, onLike, onDislike }: Props) {
           <Image
             source={product.image_url}
             style={card.photo}
-            contentFit="cover"
+            contentFit="contain"
             transition={200}
             accessibilityLabel={product.name}
           />
@@ -59,8 +59,13 @@ export function RoundButton({ label, hint, onPress }: { label: string; hint: str
   );
 }
 
+// The photos are 400 x 600. Capping the card near that width keeps them
+// sharp on a desktop (a 1,500 px-wide card blew them up about 4x), and
+// "contain" shows the whole garment instead of cropping it to fit the box.
+const MAX_CARD_WIDTH = 420;
+
 const card = StyleSheet.create({
-  wrap: { flex: 1, width: "100%" },
+  wrap: { flex: 1, width: "100%", maxWidth: MAX_CARD_WIDTH },
   // The grey box doubles as the placeholder while the photo loads.
   photoBox: { flex: 1, borderRadius: 16, overflow: "hidden", backgroundColor: colors.fieldBg },
   photo: { width: "100%", height: "100%" },

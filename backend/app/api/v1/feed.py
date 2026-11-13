@@ -1,6 +1,9 @@
 """The swipe feed and card details.
 
 GET /v1/feed?limit=10     — the next cards, best-sellers until 3 likes, then personalised
+    &pick=tops:t-shirts&pick=accessories:sunglasses
+                          — optional filter; several picks take turns
+GET /v1/feed/filters      — the categories and garment types the filter accepts
 GET /v1/products/{id}     — one garment's details
 
 The style vector is recomputed on every request from the user's history: one
@@ -18,9 +21,10 @@ from app.api.deps import get_catalog, get_current_user, get_rng
 from app.db.interactions import get_interaction_store
 from app.recs.catalog import Catalog
 from app.recs.feed import build_feed
+from app.recs.filters import FILTERS, UnknownFilter, select
 from app.recs.history import summarise
 from app.schemas.auth import UserOut
-from app.schemas.feed import FeedOut
+from app.schemas.feed import FeedOut, FilterOut
 from app.schemas.products import ProductOut
 from ml import constants
 
@@ -34,15 +38,29 @@ def feed(
     # It lists the cards it still holds so they are not sent twice. Not a vote:
     # nothing is saved, they are only left out of this one response.
     exclude: list[UUID] = Query(default=[], max_length=50),
+    # Narrow the feed: each pick is "category" or "category:type" (keys from
+    # GET /v1/feed/filters). Likes still count toward overall taste.
+    pick: list[str] = Query(default=[], max_length=20),
     user: UserOut = Depends(get_current_user),
     catalog: Catalog = Depends(get_catalog),
     store=Depends(get_interaction_store),
     rng: np.random.Generator = Depends(get_rng),
 ) -> FeedOut:
+    try:
+        keeps = [catalog.matching(selection) for selection in select(pick)]
+    except UnknownFilter as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
     history = summarise(store.history_rows(user.id))
     if exclude:
         history = replace(history, hidden=history.hidden | {str(p) for p in exclude})
-    return FeedOut.of(build_feed(catalog, history, limit, rng))
+    return FeedOut.of(build_feed(catalog, history, limit, rng, keeps=keeps))
+
+
+@router.get("/feed/filters", response_model=list[FilterOut])
+def feed_filters() -> list[FilterOut]:
+    """The buttons above the feed. Public: it's the shop's aisles, nothing personal."""
+    return [FilterOut.of(f) for f in FILTERS]
 
 
 @router.get("/products/{product_id}", response_model=ProductOut)
