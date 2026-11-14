@@ -46,6 +46,9 @@ export type Reason = {
 
 export type FeedItem = { product: Product; reason: Reason };
 
+// The three swipe buttons: ✕, "Not sure", ♡.
+export type Swipe = "like" | "dislike" | "skip";
+
 // Everything the user has liked, most recent first (GET /v1/wardrobe).
 export type Wardrobe = { count: number; items: Product[] };
 
@@ -200,8 +203,9 @@ export const api = {
   // The categories and garment types the feed can be filtered by. Public.
   filters: () => request<CategoryOption[]>("/v1/feed/filters"),
 
-  // Record a swipe. A like also puts the garment in the wardrobe.
-  interact: (token: string, productId: string, type: "like" | "dislike") =>
+  // Record a swipe. A like also puts the garment in the wardrobe. A skip
+  // ("Not sure") only hides it for the next 25 cards; it says nothing about taste.
+  interact: (token: string, productId: string, type: Swipe) =>
     request<unknown>("/v1/interactions", {
       method: "POST",
       token,

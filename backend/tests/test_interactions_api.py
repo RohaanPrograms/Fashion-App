@@ -27,10 +27,21 @@ def test_an_unknown_product_is_404_and_nothing_is_saved(api):
     assert api.interactions.rows == []
 
 
-def test_only_like_and_dislike_are_accepted(api, ids):
+def test_only_like_dislike_and_skip_are_accepted(api, ids):
     response = api.client.post("/v1/interactions", json={"product_id": ids["jeans"], "type": "superlike"})
 
     assert response.status_code == 422
+
+
+def test_a_skip_is_recorded_and_hides_the_card_for_now(api, ids):
+    response = api.client.post("/v1/interactions", json={"product_id": ids["jeans"], "type": "skip"})
+
+    assert response.status_code == 201
+    assert [r["type"] for r in api.interactions.rows] == ["skip"]
+    feed = api.client.get("/v1/feed", params={"limit": 10}).json()
+    assert ids["jeans"] not in {i["product"]["id"] for i in feed["items"]}
+    assert feed["likes"] == 0  # not a like
+    assert api.client.get("/v1/wardrobe").json()["count"] == 0
 
 
 def test_dwell_time_over_a_minute_is_rejected(api, ids):

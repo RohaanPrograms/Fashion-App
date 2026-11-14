@@ -23,6 +23,11 @@ EXPLORE_POOL = 100     # sampled from the top N of the ranking
 # of the feed until this many more swipes have happened.
 REMOVE_COOLDOWN_SWIPES = 20
 
+# "Not sure" (a skip) hides a card without saying anything about taste. It
+# may come back after this many more cards. 25 because swiping is fast: long
+# enough to have moved on, short enough to meet it again (chosen 2026-11-14).
+SKIP_COOLDOWN_SWIPES = 25
+
 # Every source of randomness in the project uses this, so results reproduce.
 RANDOM_SEED = 1234
 

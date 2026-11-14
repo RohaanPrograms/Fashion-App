@@ -83,11 +83,11 @@ def test_wardrobe_lists_the_most_recently_liked_first():
     assert h.liked == ["a", "b", "c"]
 
 
-def test_only_likes_and_dislikes_count_as_swipes_and_other_types_are_ignored():
+def test_likes_dislikes_and_skips_count_as_cards_seen_and_other_types_are_ignored():
     h = summarise(_rows(("view", "a"), ("like", "b"), ("skip", "c"), ("dislike", "d")))
 
-    assert h.swipes == 2
-    assert "a" not in h.hidden and "c" not in h.hidden
+    assert h.swipes == 3
+    assert "a" not in h.hidden
 
 
 def test_the_default_cool_down_is_the_shared_constant(monkeypatch):
@@ -96,5 +96,57 @@ def test_the_default_cool_down_is_the_shared_constant(monkeypatch):
     monkeypatch.setattr(constants, "REMOVE_COOLDOWN_SWIPES", 1)
 
     h = summarise(_rows(("like", "a"), ("remove", "a"), ("dislike", "x")))
+
+    assert "a" not in h.hidden
+
+
+# --- "Not sure": the skip ---------------------------------------------------
+
+
+def test_a_skip_hides_the_card_without_touching_taste_or_the_wardrobe():
+    h = summarise(_rows(("skip", "a")))
+
+    assert "a" in h.hidden
+    assert h.liked == [] and h.disliked == [] and h.wardrobe == []
+    assert h.swipes == 1
+
+
+def test_a_skipped_card_comes_back_after_25_more_cards():
+    still_waiting = summarise(_rows(("skip", "a"), *_swipes(24)))
+    back = summarise(_rows(("skip", "a"), *_swipes(25)))
+
+    assert "a" in still_waiting.hidden
+    assert "a" not in back.hidden
+
+
+def test_other_skips_count_towards_the_wait():
+    """Someone who skips a lot still gets their skipped cards back."""
+    h = summarise(_rows(("skip", "a"), *[("skip", f"s{i}") for i in range(25)]))
+
+    assert "a" not in h.hidden
+
+
+def test_a_later_like_or_dislike_overrides_a_skip():
+    liked = summarise(_rows(("skip", "a"), ("like", "a"), *_swipes(30)))
+    disliked = summarise(_rows(("skip", "a"), ("dislike", "a"), *_swipes(30)))
+
+    assert liked.liked == ["a"] and liked.wardrobe == ["a"] and "a" in liked.hidden
+    assert "a" in disliked.disliked and "a" in disliked.hidden
+
+
+def test_a_skip_never_undoes_a_like_or_a_dislike():
+    h = summarise(_rows(("like", "a"), ("dislike", "b"), ("skip", "a"), ("skip", "b"), *_swipes(30)))
+
+    assert h.liked == ["a"] and h.wardrobe == ["a"] and "a" in h.hidden
+    assert "b" in h.disliked and "b" in h.hidden
+
+
+def test_the_skip_wait_is_the_shared_constant(monkeypatch):
+    from ml import constants
+
+    assert constants.SKIP_COOLDOWN_SWIPES == 25
+    monkeypatch.setattr(constants, "SKIP_COOLDOWN_SWIPES", 1)
+
+    h = summarise(_rows(("skip", "a"), ("dislike", "x")))
 
     assert "a" not in h.hidden

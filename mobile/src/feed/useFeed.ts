@@ -6,7 +6,7 @@ import { Image } from "expo-image";
 import { useEffect, useRef, useState } from "react";
 
 import { withOneRetry } from "../api/retry";
-import { api, type ApiError, type CategoryOption, type FeedItem } from "../api/client";
+import { api, type ApiError, type CategoryOption, type FeedItem, type Swipe } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { NO_PICKS, samePicks, type Picks } from "./filters";
 import { afterLike, mergeProgress, progressFrom, type Progress } from "./progress";
@@ -102,7 +102,7 @@ export function useFeed() {
     }
   }
 
-  async function swipe(type: "like" | "dislike") {
+  async function swipe(type: Swipe) {
     const card = currentCard(queueRef.current);
     if (!card) return;
     const id = card.product.id;

@@ -140,7 +140,7 @@ python -m scripts.smoke_test --base-url https://<your-app>.up.railway.app
 | GET | `/v1/feed?limit=10&exclude=…&pick=…` | Bearer token | Next cards: best-sellers until 3 likes, then personalised; each card carries its reason and the garment's type, colour, pattern and description. Optional `pick` (repeatable, ≤20): a category (`shoes`) or a garment type (`tops:t-shirts`); several picks take turns, each still ranked by taste. Other colours of a design already swiped (or excluded) are left out |
 | GET | `/v1/feed/filters` | — | The filter buttons: 5 categories, each with its garment types |
 | GET | `/v1/products/{id}` | Bearer token | One garment's details |
-| POST | `/v1/interactions` | Bearer token | Record a like or dislike |
+| POST | `/v1/interactions` | Bearer token | Record a like, dislike or skip ("Not sure": hidden for the next 25 cards, no effect on taste) |
 | DELETE | `/v1/interactions` | Bearer token | Start over: forget every swipe |
 | GET | `/v1/wardrobe` | Bearer token | Liked garments, most recent first |
 | DELETE | `/v1/wardrobe/{product_id}` | Bearer token | Take one out (still counts toward taste; may return to the feed after 20 swipes) |

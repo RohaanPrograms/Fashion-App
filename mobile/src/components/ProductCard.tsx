@@ -1,8 +1,8 @@
 // One swipe card: photo, name, then type · brand · price, and the buttons
-// beneath (✕, ♡, and ⓘ for the "about / why" panel).
+// beneath: ✕, ↷ ("Not sure"), ♡, and ⓘ for the "about / why" panel.
 //
 // Deliberately "presentational": it only draws what it's given and reports
-// taps through onLike / onDislike / onToggleWhy. It knows nothing about the network,
+// taps through onLike / onDislike / onSkip / onToggleWhy. It knows nothing about the network,
 // batches or gestures. A swipe gesture can be added later by wrapping this
 // component and calling the same callbacks, with no rewrite.
 import { Image } from "expo-image";
@@ -17,12 +17,13 @@ type Props = {
   product: Product;
   onLike: () => void;
   onDislike: () => void;
+  onSkip?: () => void; // "Not sure": back in a while, no effect on taste
   onToggleWhy?: () => void;
   whyOpen?: boolean;
   children?: ReactNode; // the ⓘ panel, drawn over the photo when open
 };
 
-export function ProductCard({ product, onLike, onDislike, onToggleWhy, whyOpen = false, children }: Props) {
+export function ProductCard({ product, onLike, onDislike, onSkip, onToggleWhy, whyOpen = false, children }: Props) {
   // The type first: the name alone ("Prima") doesn't say what the garment is.
   const meta = [product.type, product.brand, formatPrice(product.price, product.currency)]
     .filter(Boolean)
@@ -49,6 +50,7 @@ export function ProductCard({ product, onLike, onDislike, onToggleWhy, whyOpen =
       <Text style={card.meta}>{meta}</Text>
       <View style={card.buttons}>
         <RoundButton label="✕" hint="Dislike" onPress={onDislike} />
+        {onSkip && <RoundButton label="↷" hint="Not sure: show me this again later" onPress={onSkip} />}
         <RoundButton label="♡" hint="Like" onPress={onLike} />
         {onToggleWhy && (
           <RoundButton
@@ -89,7 +91,8 @@ const card = StyleSheet.create({
   muted: { color: colors.muted },
   name: { fontSize: 18, fontWeight: "600", color: colors.text, marginTop: 12 },
   meta: { fontSize: 15, color: colors.muted, marginTop: 2 },
-  buttons: { flexDirection: "row", justifyContent: "center", gap: 32, marginTop: 16 },
+  // Four buttons fit a phone: 4 x 64 + 3 x 20 = 316 px.
+  buttons: { flexDirection: "row", justifyContent: "center", gap: 20, marginTop: 16 },
   round: {
     width: 64,
     height: 64,

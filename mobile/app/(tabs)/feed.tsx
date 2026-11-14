@@ -5,6 +5,7 @@ import { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import type { Swipe } from "../../src/api/client";
 import { FilterBar } from "../../src/components/FilterBar";
 import { ProductCard } from "../../src/components/ProductCard";
 import { WhyPanel } from "../../src/components/WhyPanel";
@@ -18,7 +19,7 @@ export default function Feed() {
   const { card } = feed;
   const [whyOpen, setWhyOpen] = useState(false);
 
-  function swipe(type: "like" | "dislike") {
+  function swipe(type: Swipe) {
     setWhyOpen(false); // the next card starts with the panel closed
     void feed.swipe(type);
   }
@@ -31,6 +32,7 @@ export default function Feed() {
         product={card.product}
         onLike={() => swipe("like")}
         onDislike={() => swipe("dislike")}
+        onSkip={() => swipe("skip")}
         onToggleWhy={() => setWhyOpen((open) => !open)}
         whyOpen={whyOpen}
       >
