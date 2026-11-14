@@ -129,3 +129,26 @@ def test_if_the_public_keys_cannot_be_fetched_supabase_is_asked_instead(client, 
 def test_the_key_list_address_is_the_projects_published_one():
     assert jwks_url("https://abc.supabase.co") == "https://abc.supabase.co/auth/v1/.well-known/jwks.json"
     assert jwks_url("https://abc.supabase.co/") == "https://abc.supabase.co/auth/v1/.well-known/jwks.json"
+
+
+# --- Clock difference ---------------------------------------------------------
+# Supabase stamps "iat" (issued at) with ITS clock; we check with OURS. They
+# were measured 0.7 s apart, so a brand-new guest's token looked "issued in
+# the future" and was refused on the app's very first request. A small
+# allowance fixes that without letting truly expired tokens through.
+
+
+def test_a_brand_new_token_from_a_slightly_fast_clock_is_accepted(client, project_keys, no_network):
+    token = es256(project_keys.private, iat=int(time.time()) + 5)
+
+    assert _me(client, token).status_code == 200
+
+
+def test_a_token_from_far_in_the_future_is_still_refused(client, project_keys, no_network):
+    token = es256(project_keys.private, iat=int(time.time()) + 120)
+
+    assert _me(client, token).status_code == 401
+
+
+def test_a_token_expired_beyond_the_allowance_is_still_refused(client, project_keys, no_network):
+    assert _me(client, es256(project_keys.private, expires_in=-31)).status_code == 401

@@ -217,3 +217,20 @@ def test_a_mismatched_secret_disables_local_verification(auth_settings):
 
     auth_settings(jwt_secret=OTHER_SECRET, anon_signed_with=SECRET)
     assert uses_local_verification() is False
+
+
+def test_a_brand_new_token_from_a_slightly_fast_clock_is_accepted(client, auth_settings, no_network):
+    """Supabase's clock ran 0.7 s ahead of ours: fresh tokens were refused."""
+    auth_settings(jwt_secret=SECRET)
+
+    response = client.get("/v1/auth/me", headers=auth(make_token(iat=int(time.time()) + 5)))
+
+    assert response.status_code == 200
+
+
+def test_a_token_expired_beyond_the_clock_allowance_is_still_refused(client, auth_settings, no_network):
+    auth_settings(jwt_secret=SECRET)
+
+    response = client.get("/v1/auth/me", headers=auth(make_token(expires_in=-31)))
+
+    assert response.status_code == 401

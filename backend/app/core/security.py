@@ -51,6 +51,14 @@ from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+# Supabase stamps a token's times ("issued at", "expires") with its own clock,
+# and we check them with ours. Two clocks are never exactly equal: Supabase's
+# was measured 0.7 s ahead of a dev machine, so a brand-new guest token looked
+# "issued in the future" and was refused on the app's first request. Allowing
+# this much difference is standard for JWTs; a truly expired token is still
+# refused, at most this much later (tokens live an hour).
+CLOCK_SKEW_LEEWAY_SECONDS = 30
+
 # Supabase issues user session tokens with this audience. A correctly-signed
 # token minted for anything else is not a user session and must not be accepted.
 AUDIENCE = "authenticated"
@@ -172,6 +180,7 @@ def verify_locally(token: str) -> dict | None:
             signing_key.key,
             algorithms=[algorithm],
             audience=AUDIENCE,
+            leeway=CLOCK_SKEW_LEEWAY_SECONDS,
             options={"require": ["exp", "sub"]},
         )
 
@@ -194,6 +203,7 @@ def decode_access_token(token: str) -> dict:
         settings.SUPABASE_JWT_SECRET,
         algorithms=ALGORITHMS,
         audience=AUDIENCE,
+        leeway=CLOCK_SKEW_LEEWAY_SECONDS,
         # A token with no expiry would never expire, and one with no subject
         # tells us nothing about who is calling. Neither is a usable session.
         options={"require": ["exp", "sub"]},
