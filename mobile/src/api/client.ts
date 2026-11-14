@@ -49,6 +49,18 @@ export type FeedItem = { product: Product; reason: Reason };
 // Everything the user has liked, most recent first (GET /v1/wardrobe).
 export type Wardrobe = { count: number; items: Product[] };
 
+// A saved set (an outfit). Mirrors backend/app/schemas/outfits.py.
+// total_price is computed by the server on every read (sum of known prices;
+// null if none is known), so it can't go stale.
+export type OutfitItem = { slot: string; product: Product };
+export type Outfit = {
+  id: string;
+  name: string;
+  items: OutfitItem[];
+  total_price: number | null;
+  currency: string;
+};
+
 // The buttons above the feed, from GET /v1/feed/filters (backend/app/recs/filters.py).
 export type TypeOption = { key: string; label: string };
 export type CategoryOption = { key: string; label: string; types: TypeOption[] };
@@ -206,6 +218,17 @@ export const api = {
   // "Start over": deletes every swipe, so the wardrobe empties and the feed
   // goes back to best-sellers. Saved sets are kept.
   startOver: (token: string) => request<{ deleted: number }>("/v1/interactions", { method: "DELETE", token }),
+
+  outfits: (token: string) => request<{ outfits: Outfit[] }>("/v1/outfits", { token }),
+
+  // The server re-checks every rule (src/outfits/builder.ts mirrors them) and
+  // answers 422 with a plain-words reason if one is broken.
+  createOutfit: (token: string, name: string, productIds: string[]) =>
+    request<Outfit>("/v1/outfits", { method: "POST", token, body: { name, product_ids: productIds } }),
+
+  // Deletes the set only; its items stay in the wardrobe.
+  deleteOutfit: (token: string, outfitId: string) =>
+    request<unknown>(`/v1/outfits/${encodeURIComponent(outfitId)}`, { method: "DELETE", token }),
 
   // Step 3: give the now-verified account a password, so it can log in.
   setPassword: (token: string, password: string) =>
