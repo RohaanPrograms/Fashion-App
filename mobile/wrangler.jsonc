@@ -1,0 +1,17 @@
+// How Cloudflare Workers serves the web app (fittfeed.com).
+//
+// The build (`EXPO_PUBLIC_ENV=prod npx expo export -p web`) writes plain
+// HTML/JS/CSS to dist/. There is no server code: this Worker only serves
+// those files, which Cloudflare does for free.
+//
+// "single-page-application": for any address that isn't a real file (say
+// /wardrobe), serve index.html and let the app pick the screen. Without it,
+// reloading on /wardrobe would be a 404.
+{
+  "name": "fittfeed",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}

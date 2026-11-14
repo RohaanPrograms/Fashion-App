@@ -76,30 +76,35 @@ npx tsc --noEmit     # TypeScript type check (run in CI)
 npx jest             # tests for the pure logic (run in CI)
 ```
 
-## Deploying the web app (Cloudflare Pages)
+## Deploying the web app (Cloudflare Workers)
 
 The web version is a static single-page app: `npx expo export -p web` writes
-plain HTML/JS/CSS to `dist/`, and Cloudflare Pages serves it. Every push to
-`main` rebuilds it. Settings, in the Cloudflare dashboard (Workers & Pages →
-the project → Settings):
+plain HTML/JS/CSS to `dist/`, and a Cloudflare Worker serves those files
+(there is no server code; serving static files is free). `wrangler.jsonc`
+holds the Worker's settings. Every push to `main` rebuilds and redeploys it.
+
+Settings in the Cloudflare dashboard (Workers & Pages → `fittfeed` →
+Settings → Build):
 
 | Setting | Value |
 |---|---|
-| Production branch | `main` |
-| Root directory | `mobile` |
-| Build command | `npx expo export -p web` |
-| Build output directory | `dist` |
-| Environment variable | `EXPO_PUBLIC_ENV` = `prod` |
-| Environment variable | `NODE_VERSION` = `22` |
-| Custom domain | `fittfeed.com` (and `www.fittfeed.com`) |
+| Git repository / branch | this repo, `main` |
+| Root directory ("Path") | `/mobile` |
+| Build command | `EXPO_PUBLIC_ENV=prod npx expo export -p web` |
+| Deploy command | `npx wrangler deploy` |
+| Build variable | `NODE_VERSION` = `22` (Wrangler needs Node 22.12 or newer) |
+| Custom domains | `fittfeed.com`, `www.fittfeed.com` (Settings → Domains & Routes) |
 
-- **No routing file is needed.** With no `404.html` in `dist/`, Cloudflare
-  Pages treats the site as a single-page app and serves `index.html` for every
-  address, so reloading on `/wardrobe` works.
+- **`EXPO_PUBLIC_ENV=prod` is in the build command on purpose:** it has to be
+  there while the app is built (it picks the live API address), and a
+  build-time setting is easy to put in the wrong (runtime) variables list.
+- **Reloading on `/wardrobe` works** because `wrangler.jsonc` sets
+  `not_found_handling` to `single-page-application`: any address that isn't
+  a real file gets `index.html`, and the app picks the screen.
 - **CORS:** the API only answers browsers on addresses it lists. The site's
-  address must be in the API's `CORS_ORIGINS` (Railway → Variables), exactly,
-  e.g. `https://fittfeed.com,https://www.fittfeed.com`. Cloudflare's per-change
-  preview addresses aren't listed, so previews can't talk to the API.
+  addresses must be in the API's `CORS_ORIGINS` (Railway → Variables),
+  exactly, e.g. `https://fittfeed.com,https://www.fittfeed.com`. Preview
+  builds get other addresses that aren't listed, so they can't talk to the API.
 - **To test a build locally**, `npx expo serve` does *not* fall back to
   `index.html`, so opening `/wardrobe` directly gives a 404 there (not on
   Cloudflare).
