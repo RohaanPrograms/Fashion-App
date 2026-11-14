@@ -5,6 +5,7 @@
 import { Image } from "expo-image";
 import { useEffect, useRef, useState } from "react";
 
+import { withOneRetry } from "../api/retry";
 import { api, type ApiError, type CategoryOption, type FeedItem } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { NO_PICKS, samePicks, type Picks } from "./filters";
@@ -25,6 +26,8 @@ import { useFeedResetVersion } from "./resetSignal";
 // reset: start from scratch (also when the filter changes). append: the
 // prefetch. replace: the personalised switch.
 type LoadMode = "reset" | "append" | "replace";
+
+const SWIPE_FAILED = "That swipe didn't save.";
 
 function message(err: unknown): string {
   return (err as ApiError)?.detail ?? "Something went wrong.";
@@ -118,9 +121,14 @@ export function useFeed() {
 
     try {
       const token = await getValidToken();
-      await api.interact(token, id, type);
+      // A dropped connection is retried once, a second later, before the
+      // visitor is told anything. Saving the same swipe twice is harmless:
+      // the server goes by the latest action on each garment.
+      await withOneRetry(() => api.interact(token, id, type));
+      // A later swipe that saves clears an earlier "didn't save" message.
+      setError((current) => (current?.startsWith(SWIPE_FAILED) ? null : current));
     } catch (err) {
-      setError(`That swipe didn't save. ${message(err)}`);
+      setError(`${SWIPE_FAILED} ${message(err)}`);
     } finally {
       pending.current.delete(id);
     }

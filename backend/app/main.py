@@ -41,6 +41,31 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+@app.middleware("http")
+async def unhandled_error(request: Request, call_next):
+    """Any uncaught error becomes a clean JSON answer, never a stack trace.
+
+    If Supabase could not be reached, say so — 503, "try again" — because
+    nothing is wrong with the request. Anything else is a bug: 500.
+
+    WHY A MIDDLEWARE, NOT AN EXCEPTION HANDLER FOR `Exception`
+    ----------------------------------------------------------
+    FastAPI runs a handler for plain `Exception` in the outermost layer of the
+    server, outside CORSMiddleware. Its answers went out without CORS headers,
+    so the browser threw them away and the web app could only say "couldn't
+    reach the server" even though the server had answered. Registered here,
+    BEFORE CORSMiddleware is added (the last one added runs first, outermost),
+    this sits inside CORS, so error answers carry the headers too.
+    """
+    try:
+        return await call_next(request)
+    except Exception as exc:  # noqa: BLE001 — this IS the last-resort handler
+        log_upstream_failure(f"{request.method} {request.url.path}", exc)
+        if is_infrastructure_error(exc):
+            return JSONResponse(status_code=503, content={"detail": UNAVAILABLE_DETAIL})
+        return JSONResponse(status_code=500, content={"detail": "Something went wrong on our side."})
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
@@ -54,19 +79,6 @@ app.include_router(interactions.router, prefix="/v1")
 app.include_router(feed.router, prefix="/v1")
 app.include_router(wardrobe.router, prefix="/v1")
 app.include_router(outfits.router, prefix="/v1")
-
-
-@app.exception_handler(Exception)
-async def unhandled_error(request: Request, exc: Exception) -> JSONResponse:
-    """Any uncaught error becomes a clean JSON answer, never a stack trace.
-
-    If Supabase could not be reached, say so — 503, "try again" — because
-    nothing is wrong with the request. Anything else is a bug: 500.
-    """
-    log_upstream_failure(f"{request.method} {request.url.path}", exc)
-    if is_infrastructure_error(exc):
-        return JSONResponse(status_code=503, content={"detail": UNAVAILABLE_DETAIL})
-    return JSONResponse(status_code=500, content={"detail": "Something went wrong on our side."})
 
 
 @app.get("/health", tags=["meta"])
