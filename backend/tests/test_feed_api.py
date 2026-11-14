@@ -158,3 +158,15 @@ def test_several_picks_take_turns_over_http(api, ids):
 def test_picks_are_capped(api):
     assert api.client.get("/v1/feed", params={"pick": ["shoes"] * 20}).status_code == 200
     assert api.client.get("/v1/feed", params={"pick": ["shoes"] * 21}).status_code == 422
+
+
+def test_each_card_says_what_the_garment_is(api, ids):
+    """The card's "About this piece" panel: type, pattern, description."""
+    body = api.client.get("/v1/feed", params={"limit": 1}).json()
+
+    product = body["items"][0]["product"]
+    assert product["id"] == ids["black_tee"]
+    assert product["type"] == "T-shirt"
+    assert product["pattern"] == "Solid"
+    assert product["colour"] == "Black"
+    assert product["description"] == "A black tee."

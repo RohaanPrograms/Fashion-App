@@ -18,7 +18,7 @@ import {
 
 function card(id: string): FeedItem {
   return {
-    product: { id, name: id, brand: null, price: null, currency: "USD", image_url: null, category: null, colour: null },
+    product: { id, name: id, brand: null, price: null, currency: "USD", image_url: null, category: null, colour: null, type: null, pattern: null, description: null },
     reason: { kind: "popular", similarity: null, because_of: null },
   };
 }

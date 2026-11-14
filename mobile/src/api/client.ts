@@ -30,6 +30,9 @@ export type Product = {
   image_url: string | null;
   category: string | null;
   colour: string | null;
+  type: string | null; // "Vest top"
+  pattern: string | null; // "Solid"
+  description: string | null; // H&M's one sentence about it
 };
 
 // Why a card was picked. "popular": a best-seller (before 3 likes).

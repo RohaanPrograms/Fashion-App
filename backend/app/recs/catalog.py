@@ -57,6 +57,8 @@ class Product:
     popularity: int
     colour: str | None
     product_type: str | None = None  # "Vest top", "Trousers": what the filters use
+    pattern: str | None = None  # "Solid", "Stripe": H&M's graphical appearance
+    description: str | None = None  # H&M's one-sentence description
 
 
 @dataclass(frozen=True)
@@ -125,6 +127,8 @@ def _product(row: dict) -> Product:
         popularity=int(row.get("popularity") or 0),
         colour=attributes.get("colour"),
         product_type=attributes.get("type"),
+        pattern=attributes.get("appearance"),
+        description=attributes.get("description"),
     )
 
 

@@ -137,7 +137,7 @@ python -m scripts.smoke_test --base-url https://<your-app>.up.railway.app
 | POST | `/v1/auth/password` | Bearer token (verified) | Step 3: set a password so the account can log in |
 | POST | `/v1/auth/refresh` | none | Swap a refresh token for a fresh access token |
 | GET | `/v1/auth/me` | Bearer token | Current user, incl. `is_anonymous` |
-| GET | `/v1/feed?limit=10&exclude=…&pick=…` | Bearer token | Next cards: best-sellers until 3 likes, then personalised; each card carries its reason. Optional `pick` (repeatable, ≤20): a category (`shoes`) or a garment type (`tops:t-shirts`); several picks take turns, each still ranked by taste. Other colours of a design already swiped (or excluded) are left out |
+| GET | `/v1/feed?limit=10&exclude=…&pick=…` | Bearer token | Next cards: best-sellers until 3 likes, then personalised; each card carries its reason and the garment's type, colour, pattern and description. Optional `pick` (repeatable, ≤20): a category (`shoes`) or a garment type (`tops:t-shirts`); several picks take turns, each still ranked by taste. Other colours of a design already swiped (or excluded) are left out |
 | GET | `/v1/feed/filters` | — | The filter buttons: 5 categories, each with its garment types |
 | GET | `/v1/products/{id}` | Bearer token | One garment's details |
 | POST | `/v1/interactions` | Bearer token | Record a like or dislike |

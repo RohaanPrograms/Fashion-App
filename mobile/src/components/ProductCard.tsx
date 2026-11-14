@@ -1,10 +1,12 @@
-// One swipe card: photo, name, brand, price, and the buttons beneath.
+// One swipe card: photo, name, then type · brand · price, and the buttons
+// beneath (✕, ♡, and ⓘ for the "about / why" panel).
 //
 // Deliberately "presentational": it only draws what it's given and reports
-// taps through onLike / onDislike. It knows nothing about the network,
+// taps through onLike / onDislike / onToggleWhy. It knows nothing about the network,
 // batches or gestures. A swipe gesture can be added later by wrapping this
 // component and calling the same callbacks, with no rewrite.
 import { Image } from "expo-image";
+import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { Product } from "../api/client";
@@ -15,10 +17,16 @@ type Props = {
   product: Product;
   onLike: () => void;
   onDislike: () => void;
+  onToggleWhy?: () => void;
+  whyOpen?: boolean;
+  children?: ReactNode; // the ⓘ panel, drawn over the photo when open
 };
 
-export function ProductCard({ product, onLike, onDislike }: Props) {
-  const meta = [product.brand, formatPrice(product.price, product.currency)].filter(Boolean).join(" · ");
+export function ProductCard({ product, onLike, onDislike, onToggleWhy, whyOpen = false, children }: Props) {
+  // The type first: the name alone ("Prima") doesn't say what the garment is.
+  const meta = [product.type, product.brand, formatPrice(product.price, product.currency)]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <View style={card.wrap}>
       <View style={card.photoBox}>
@@ -35,12 +43,20 @@ export function ProductCard({ product, onLike, onDislike }: Props) {
             <Text style={card.muted}>No photo</Text>
           </View>
         )}
+        {whyOpen && children}
       </View>
       <Text style={card.name} numberOfLines={2}>{product.name}</Text>
       <Text style={card.meta}>{meta}</Text>
       <View style={card.buttons}>
         <RoundButton label="✕" hint="Dislike" onPress={onDislike} />
         <RoundButton label="♡" hint="Like" onPress={onLike} />
+        {onToggleWhy && (
+          <RoundButton
+            label={whyOpen ? "×" : "ⓘ"}
+            hint={whyOpen ? "Close details" : "About this piece, and why you're seeing it"}
+            onPress={onToggleWhy}
+          />
+        )}
       </View>
     </View>
   );
