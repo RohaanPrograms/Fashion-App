@@ -46,6 +46,9 @@ export type Reason = {
 
 export type FeedItem = { product: Product; reason: Reason };
 
+// Everything the user has liked, most recent first (GET /v1/wardrobe).
+export type Wardrobe = { count: number; items: Product[] };
+
 // The buttons above the feed, from GET /v1/feed/filters (backend/app/recs/filters.py).
 export type TypeOption = { key: string; label: string };
 export type CategoryOption = { key: string; label: string; types: TypeOption[] };
@@ -192,6 +195,17 @@ export const api = {
       token,
       body: { product_id: productId, type },
     }),
+
+  wardrobe: (token: string) => request<Wardrobe>("/v1/wardrobe", { token }),
+
+  // Leaves the wardrobe but still counts as a like; may return to the feed
+  // after 20 more swipes.
+  removeFromWardrobe: (token: string, productId: string) =>
+    request<unknown>(`/v1/wardrobe/${encodeURIComponent(productId)}`, { method: "DELETE", token }),
+
+  // "Start over": deletes every swipe, so the wardrobe empties and the feed
+  // goes back to best-sellers. Saved sets are kept.
+  startOver: (token: string) => request<{ deleted: number }>("/v1/interactions", { method: "DELETE", token }),
 
   // Step 3: give the now-verified account a password, so it can log in.
   setPassword: (token: string, password: string) =>

@@ -20,6 +20,7 @@ import {
   shouldPrefetch,
   type FeedQueue,
 } from "./queue";
+import { useFeedResetVersion } from "./resetSignal";
 
 // reset: start from scratch (also when the filter changes). append: the
 // prefetch. replace: the personalised switch.
@@ -128,9 +129,12 @@ export function useFeed() {
     if (switchNow) void load("replace");
   }
 
+  // Start again from the server's view (used after "start over"). The
+  // filter stays as it is: the feed restarts within whatever is picked.
   function reset() {
     setQueue(emptyQueue);
     setProgress(null);
+    setError(null);
     void load("reset");
   }
 
@@ -152,6 +156,17 @@ export function useFeed() {
       .then(setOptions)
       .catch(() => {}); // no buttons is fine; the feed still works
   }, []);
+
+  // "Start over" on the Wardrobe tab: begin again from best-sellers.
+  // Only a bump that happens while this feed is open counts: one from before
+  // it opened is already reflected in the first load.
+  const resetVersion = useFeedResetVersion();
+  const seenVersion = useRef(resetVersion);
+  useEffect(() => {
+    if (resetVersion === seenVersion.current) return;
+    seenVersion.current = resetVersion;
+    reset();
+  }, [resetVersion]);
 
   return {
     card: currentCard(queue),
