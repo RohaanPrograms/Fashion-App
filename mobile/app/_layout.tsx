@@ -17,6 +17,7 @@ import { Stack } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AuthProvider, useAuth } from "../src/auth/AuthContext";
+import { PhoneFrame } from "../src/components/PhoneFrame";
 
 function RootNavigator() {
   const { user, loading } = useAuth();
@@ -38,7 +39,9 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <RootNavigator />
+        <PhoneFrame>
+          <RootNavigator />
+        </PhoneFrame>
       </AuthProvider>
     </SafeAreaProvider>
   );

@@ -20,12 +20,14 @@ export const APP_ENV: AppEnv = ["dev", "staging", "prod"].includes(requested)
   ? requested
   : "dev";
 
-// Default backend URL for each environment. Fill in staging/prod once those
-// backends are actually deployed (Phase 0 only needs dev).
+// Default backend URL for each environment. There is no separate staging
+// deployment; staging and prod both use the live API on Railway. The web
+// build on Cloudflare Pages sets EXPO_PUBLIC_ENV=prod.
+const LIVE_API = "https://fashion-app-production-fb70.up.railway.app";
 const API_URL_BY_ENV: Record<AppEnv, string> = {
   dev: "http://localhost:8000",
-  staging: "https://staging-api.your-domain.com",
-  prod: "https://api.your-domain.com",
+  staging: LIVE_API,
+  prod: LIVE_API,
 };
 
 // The base URL of the FastAPI backend for the selected environment.
