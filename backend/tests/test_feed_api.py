@@ -169,4 +169,5 @@ def test_each_card_says_what_the_garment_is(api, ids):
     assert product["type"] == "T-shirt"
     assert product["pattern"] == "Solid"
     assert product["colour"] == "Black"
+    assert product["colour_family"] == "Black"
     assert product["description"] == "A black tee."

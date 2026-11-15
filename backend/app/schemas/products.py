@@ -16,6 +16,7 @@ class ProductOut(BaseModel):
     type: str | None  # "Vest top"
     pattern: str | None  # "Solid"
     description: str | None
+    colour_family: str | None  # "Beige" for "Light Beige": the wardrobe's Colour filter
 
     @classmethod
     def of(cls, product: Product) -> "ProductOut":
@@ -31,4 +32,5 @@ class ProductOut(BaseModel):
             type=product.product_type,
             pattern=product.pattern,
             description=product.description,
+            colour_family=product.colour_family,
         )

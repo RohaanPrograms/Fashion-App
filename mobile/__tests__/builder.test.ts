@@ -26,6 +26,7 @@ function product(id: string, category: string | null, price: number | null = 10)
     type: null,
     pattern: null,
     description: null,
+    colour_family: null,
   };
 }
 const tee = product("tee", "Garment Upper body", 9.99);

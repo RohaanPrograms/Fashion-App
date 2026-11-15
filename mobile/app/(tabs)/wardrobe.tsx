@@ -3,7 +3,8 @@
 // counts towards your taste); Start over wipes every swipe. Both ask by
 // turning red ("Are you sure?") and act on a second tap: no pop-ups.
 // The account banner lives here too: "Save your wardrobe with an email" for
-// guests, the email and "Log out" for everyone else.
+// guests, the email and "Log out" for everyone else. "Filter" narrows the grid
+// by category, type, colour and pattern (src/wardrobe/filters.ts).
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { FlatList, StyleSheet, Text, View, useWindowDimensions } from "react-native";
@@ -14,8 +15,10 @@ import { useAuth } from "../../src/auth/AuthContext";
 import { AccountBanner } from "../../src/components/AccountBanner";
 import { ConfirmButton } from "../../src/components/ConfirmButton";
 import { ProductTile } from "../../src/components/ProductTile";
+import { WardrobeFilters } from "../../src/components/WardrobeFilters";
 import { bumpFeedReset } from "../../src/feed/resetSignal";
 import { colors, styles } from "../../src/theme";
+import { NO_WARDROBE_FILTER, applyFilter, type WardrobeFilter } from "../../src/wardrobe/filters";
 
 const GAP = 12;
 const PADDING = 16;
@@ -32,6 +35,9 @@ export default function Wardrobe() {
   // null = still loading the first time; [] = loaded, nothing liked yet.
   const [items, setItems] = useState<Product[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Narrows what the grid shows; the title's count stays the whole wardrobe.
+  const [filter, setFilter] = useState<WardrobeFilter>(NO_WARDROBE_FILTER);
+  const shown = items ? applyFilter(items, filter) : [];
 
   // useFocusEffect runs every time this tab comes into view. getValidToken
   // always reads the latest session, so the first copy is fine to keep: hence
@@ -78,7 +84,7 @@ export default function Wardrobe() {
     <SafeAreaView style={local.screen} edges={["top"]}>
       <FlatList
         style={{ width: columnWidth, alignSelf: "center" }}
-        data={items ?? []}
+        data={shown}
         keyExtractor={(p) => p.id}
         numColumns={2}
         columnWrapperStyle={{ gap: GAP }}
@@ -101,6 +107,9 @@ export default function Wardrobe() {
             <AccountBanner />
             {error && <Text style={styles.error}>{error}</Text>}
             {items !== null && (
+              <WardrobeFilters items={items} shown={shown.length} filter={filter} onChange={setFilter} />
+            )}
+            {items !== null && (
               // What a pop-up would have explained, said once for the whole screen.
               <Text style={local.hint}>
                 {items.length > 0 &&
@@ -111,7 +120,9 @@ export default function Wardrobe() {
           </View>
         }
         ListEmptyComponent={
-          items === null ? null : (
+          items === null ? null : items.length > 0 ? (
+            <Text style={styles.subtitle}>Nothing in your wardrobe matches these filters.</Text>
+          ) : (
             <Text style={styles.subtitle}>Nothing here yet. Tap ♡ on the Feed tab and it lands here.</Text>
           )
         }

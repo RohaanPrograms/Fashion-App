@@ -33,6 +33,7 @@ export type Product = {
   type: string | null; // "Vest top"
   pattern: string | null; // "Solid"
   description: string | null; // H&M's one sentence about it
+  colour_family: string | null; // "Beige" for "Light Beige": the wardrobe's Colour filter
 };
 
 // Why a card was picked. "popular": a best-seller (before 3 likes).

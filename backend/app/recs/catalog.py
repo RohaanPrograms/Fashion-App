@@ -59,6 +59,7 @@ class Product:
     product_type: str | None = None  # "Vest top", "Trousers": what the filters use
     pattern: str | None = None  # "Solid", "Stripe": H&M's graphical appearance
     description: str | None = None  # H&M's one-sentence description
+    colour_family: str | None = None  # "Beige", not "Light Beige": the wardrobe filter
 
 
 @dataclass(frozen=True)
@@ -129,6 +130,7 @@ def _product(row: dict) -> Product:
         product_type=attributes.get("type"),
         pattern=attributes.get("appearance"),
         description=attributes.get("description"),
+        colour_family=attributes.get("colour_family"),
     )
 
 

@@ -36,6 +36,26 @@ def image_url(base_url: str, bucket: str, article_id: str) -> str:
     return f"{base_url}/storage/v1/object/public/{bucket}/{article_id}.webp"
 
 
+# H&M's 18 colour families ("perceived colour master"), for the wardrobe's
+# Colour filter. The 47 shades in colour_group_name ("Light Beige", "Dark
+# Beige", ...) would make four beige buttons; families are what people mean.
+# A few get friendlier names; "Unknown"/"undefined" are left empty.
+COLOUR_FAMILY_NAMES = {
+    "Metal": "Metallic",
+    "Khaki green": "Khaki",
+    "Lilac Purple": "Purple",
+    "Mole": "Taupe",
+}
+NO_COLOUR_FAMILY = {"Unknown", "undefined"}
+
+
+def colour_family(raw) -> str | None:
+    name = _text(raw)
+    if name is None or name in NO_COLOUR_FAMILY:
+        return None
+    return COLOUR_FAMILY_NAMES.get(name, name)
+
+
 def _text(value) -> str | None:
     """pandas reads empty cells as NaN, which JSON cannot carry; send null instead."""
     return None if pd.isna(value) else str(value)
@@ -66,6 +86,7 @@ def build_product_row(record: dict, base_url: str, bucket: str) -> dict:
             # The garment type ("Vest top", "Trousers"): what the feed filters
             # by, and what the card's details panel calls the piece.
             "type": _text(record.get("product_type_name")),
+            "colour_family": colour_family(record.get("perceived_colour_master_name")),
             "description": _text(record.get("detail_desc")),
         },
     }

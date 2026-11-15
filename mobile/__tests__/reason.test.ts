@@ -18,6 +18,7 @@ const prima: Product = {
   type: "Vest top",
   pattern: "Solid",
   description: "V-neck top in woven fabric with spaghetti shoulder straps.",
+  colour_family: "Black",
 };
 
 test("similarity is shown with two decimals", () => {

@@ -355,6 +355,7 @@ def small_catalog(ids):
         row = product_row(ids[name], name, category, code, popularity, price)
         row["attributes"]["type"] = _SMALL_TYPES[name]
         row["attributes"]["appearance"] = "Solid"
+        row["attributes"]["colour_family"] = "Black"
         row["attributes"]["description"] = f"A {name.replace('_', ' ')}."
         products.append(row)
         vectors.append({"product_id": ids[name], "vector": vector, "model_version": "als-2f-v1"})

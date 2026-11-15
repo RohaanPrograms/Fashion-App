@@ -12,6 +12,7 @@ def _record(**overrides) -> dict:
         "department_name": "Trousers",
         "graphical_appearance_name": "Solid",
         "product_type_name": "Trousers",
+        "perceived_colour_master_name": "Black",
         "detail_desc": "High-waisted jeans in washed superstretch denim.",
         "popularity": 10903,
     }
@@ -56,6 +57,7 @@ def test_builds_a_row_matching_the_products_table():
     assert row["url"] == "https://www2.hm.com/en_gb/productpage.0706016001.html"
     assert row["attributes"]["colour"] == "Black"
     assert row["attributes"]["type"] == "Trousers"
+    assert row["attributes"]["colour_family"] == "Black"
     assert row["attributes"]["description"] == "High-waisted jeans in washed superstretch denim."
     # The database client sends JSON; numpy integers are not JSON-serialisable.
     assert type(row["popularity"]) is int
@@ -67,3 +69,18 @@ def test_missing_name_falls_back_to_the_article_id():
         _record(prod_name=float("nan")), "https://abc.supabase.co", "product-images"
     )
     assert row["name"] == "Article 0706016001"
+
+
+def test_colour_families_get_friendly_names_and_unknown_is_left_empty():
+    """The wardrobe's Colour filter shows these as buttons."""
+    def family(raw):
+        row = build_product_row(_record(perceived_colour_master_name=raw), "https://abc.supabase.co", "product-images")
+        return row["attributes"]["colour_family"]
+
+    assert family("Metal") == "Metallic"
+    assert family("Khaki green") == "Khaki"
+    assert family("Lilac Purple") == "Purple"
+    assert family("Mole") == "Taupe"
+    assert family("Blue") == "Blue"
+    assert family("Unknown") is None and family("undefined") is None
+    assert family(float("nan")) is None
