@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { Product } from "../api/client";
-import { formatPrice } from "../format";
+import { usePriceFormatter } from "../currencyStore";
 import { colors } from "../theme";
 
 type Props = {
@@ -25,7 +25,8 @@ type Props = {
 
 export function ProductCard({ product, onLike, onDislike, onSkip, onToggleWhy, whyOpen = false, children }: Props) {
   // The type first: the name alone ("Prima") doesn't say what the garment is.
-  const meta = [product.type, product.brand, formatPrice(product.price, product.currency)]
+  const price = usePriceFormatter(); // in the chosen currency, "≈" if converted
+  const meta = [product.type, product.brand, price(product.price, product.currency)]
     .filter(Boolean)
     .join(" · ");
   return (

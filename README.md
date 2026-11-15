@@ -59,7 +59,7 @@ Every gap is well clear of chance: the 95% bootstrap intervals don't overlap (re
 
 ## Limitations
 
-- **A research dataset, not a shop.** Prices are synthetic and nothing can be bought. The H&M data is licensed for non-commercial research only.
+- **A research dataset, not a shop.** Prices are synthetic (in pounds; shown in your currency at a fixed, approximate rate, marked ≈) and nothing can be bought. The H&M data is licensed for non-commercial research only.
 - **"Bought together" isn't "goes together".** The model learned from co-purchases, not from what makes a good outfit.
 - **The dislike weight (0.3) is a guess.** The dataset has purchases but no dislikes, so it couldn't be learned or validated.
 - **Tested offline.** The numbers come from replaying past shoppers, not from live visitors.

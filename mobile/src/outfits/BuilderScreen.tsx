@@ -22,7 +22,7 @@ import {
 import { api, type ApiError, type Product } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { ProductTile } from "../components/ProductTile";
-import { formatPrice } from "../format";
+import { usePriceFormatter } from "../currencyStore";
 import { colors, styles } from "../theme";
 import {
   MAX_NAME_LENGTH,
@@ -51,6 +51,7 @@ export function BuilderScreen({ outfitId }: { outfitId?: string }) {
   const { getValidToken, loading } = useAuth();
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const price = usePriceFormatter();
   const columnWidth = Math.min(width, MAX_WIDTH);
   const editing = outfitId !== undefined;
 
@@ -153,7 +154,7 @@ export function BuilderScreen({ outfitId }: { outfitId?: string }) {
   }
 
   const saveLabel = saving ? "Saving…" : editing ? "Save changes" : "Save set";
-  const totalText = `Total ${total === null ? "—" : formatPrice(total, currency)}`;
+  const totalText = `Total ${total === null ? "—" : price(total, currency)}`;
 
   if (reviewing) {
     return (
@@ -177,7 +178,7 @@ export function BuilderScreen({ outfitId }: { outfitId?: string }) {
                     <View style={{ flex: 1, gap: 2 }}>
                       <Text style={s.reviewName}>{p.name}</Text>
                       {p.type && <Text style={s.reviewMeta}>{p.type}</Text>}
-                      <Text style={s.reviewMeta}>{formatPrice(p.price, p.currency)}</Text>
+                      <Text style={s.reviewMeta}>{price(p.price, p.currency)}</Text>
                     </View>
                   </View>
                 ))}

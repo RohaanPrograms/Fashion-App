@@ -14,6 +14,7 @@ import { api, type ApiError, type Product } from "../../src/api/client";
 import { useAuth } from "../../src/auth/AuthContext";
 import { AccountBanner } from "../../src/components/AccountBanner";
 import { ConfirmButton } from "../../src/components/ConfirmButton";
+import { CurrencyPicker } from "../../src/components/CurrencyPicker";
 import { ProductTile } from "../../src/components/ProductTile";
 import { WardrobeFilters } from "../../src/components/WardrobeFilters";
 import { bumpFeedReset } from "../../src/feed/resetSignal";
@@ -105,6 +106,7 @@ export default function Wardrobe() {
               )}
             </View>
             <AccountBanner />
+            <CurrencyPicker />
             {error && <Text style={styles.error}>{error}</Text>}
             {items !== null && (
               <WardrobeFilters items={items} shown={shown.length} filter={filter} onChange={setFilter} />

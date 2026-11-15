@@ -10,7 +10,7 @@ import { api, type ApiError, type Outfit } from "../../src/api/client";
 import { useAuth } from "../../src/auth/AuthContext";
 import { ConfirmButton } from "../../src/components/ConfirmButton";
 import { ProductTile } from "../../src/components/ProductTile";
-import { formatPrice } from "../../src/format";
+import { usePriceFormatter } from "../../src/currencyStore";
 import { colors, styles } from "../../src/theme";
 
 const MAX_WIDTH = 430; // phone width; a centred column on desktop
@@ -19,6 +19,7 @@ export default function Outfits() {
   const { getValidToken } = useAuth();
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const price = usePriceFormatter();
   const [outfits, setOutfits] = useState<Outfit[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,7 +78,7 @@ export default function Outfits() {
             <View style={s.headerRow}>
               <Text style={s.name} numberOfLines={1}>{item.name}</Text>
               <Text style={s.total}>
-                {item.total_price === null ? "—" : formatPrice(item.total_price, item.currency)}
+                {item.total_price === null ? "—" : price(item.total_price, item.currency)}
               </Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>

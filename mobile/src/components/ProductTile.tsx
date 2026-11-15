@@ -4,13 +4,14 @@ import { Image } from "expo-image";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { Product } from "../api/client";
-import { formatPrice } from "../format";
+import { usePriceFormatter } from "../currencyStore";
 import { colors } from "../theme";
 
 type Props = { product: Product; width: number; selected?: boolean; onPress?: () => void };
 
 export function ProductTile({ product, width, selected = false, onPress }: Props) {
-  const meta = [product.type, formatPrice(product.price, product.currency)].filter(Boolean).join(" · ");
+  const price = usePriceFormatter();
+  const meta = [product.type, price(product.price, product.currency)].filter(Boolean).join(" · ");
   const body = (
     <View style={{ width }}>
       <View style={[t.photoBox, selected && t.selected]}>
