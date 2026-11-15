@@ -97,3 +97,45 @@ def test_deleting_my_outfit_is_204_and_someone_elses_is_404(api, ids):
     assert api.client.delete(f"/v1/outfits/{mine}").status_code == 204
     assert api.client.get("/v1/outfits").json()["outfits"] == []
     assert len(api.outfits.outfits) == 1  # theirs survived
+
+
+# --- Editing a saved set ---------------------------------------------------------
+
+def _edit(api, outfit_id, ids, names, name="Saturday"):
+    return api.client.put(
+        f"/v1/outfits/{outfit_id}", json={"name": name, "product_ids": [ids[n] for n in names]}
+    )
+
+
+def test_editing_a_set_renames_it_and_swaps_its_items(api, ids):
+    outfit_id = _create(api, ids, ["black_tee", "jeans"]).json()["id"]
+
+    response = _edit(api, outfit_id, ids, ["dress", "heels", "belt"])
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == outfit_id and body["name"] == "Saturday"
+    assert [i["product"]["name"] for i in body["items"]] == ["dress", "heels", "belt"]
+    assert body["total_price"] == 98.0
+    listed = api.client.get("/v1/outfits").json()["outfits"]
+    assert len(listed) == 1 and listed[0]["name"] == "Saturday"
+
+
+def test_an_edit_follows_the_same_rules(api, ids):
+    outfit_id = _create(api, ids, ["black_tee", "jeans"]).json()["id"]
+
+    assert _edit(api, outfit_id, ids, ["dress", "jeans"]).status_code == 422
+    assert _edit(api, outfit_id, ids, ["dress"]).status_code == 422
+    assert _edit(api, outfit_id, ids, ["dress", "heels"], name="  ").status_code == 422
+    # Refused edits change nothing.
+    assert api.client.get("/v1/outfits").json()["outfits"][0]["name"] == "Friday"
+
+
+def test_editing_someone_elses_or_a_missing_set_is_404(api, ids):
+    outfit_id = _create(api, ids, ["black_tee", "jeans"]).json()["id"]
+    api.sign_in_as(USER_B)
+
+    assert _edit(api, outfit_id, ids, ["dress", "heels"]).status_code == 404
+    assert _edit(api, "00000000-0000-4000-9000-000000009999", ids, ["dress", "heels"]).status_code == 404
+    api.sign_in_as(USER_A)
+    assert api.client.get("/v1/outfits").json()["outfits"][0]["name"] == "Friday"

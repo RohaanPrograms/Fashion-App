@@ -453,6 +453,13 @@ class FakeOutfitStore:
             for o in sorted(mine, key=lambda o: o["created_at"], reverse=True)
         ]
 
+    def replace(self, user_id, outfit_id, name, items):
+        for o in self.outfits:
+            if o["id"] == outfit_id and o["user_id"] == user_id:
+                o["name"], o["items"] = name, list(items)
+                return True
+        return False
+
     def delete(self, user_id, outfit_id):
         before = len(self.outfits)
         self.outfits = [

@@ -30,6 +30,7 @@ function RootNavigator() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="save" />
         <Stack.Screen name="outfits/new" options={{ headerShown: true, title: "New set" }} />
+        <Stack.Screen name="outfits/[id]/edit" options={{ headerShown: true, title: "Edit set" }} />
       </Stack.Protected>
     </Stack>
   );

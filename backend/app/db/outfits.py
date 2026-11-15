@@ -45,6 +45,45 @@ class SupabaseOutfitStore:
             .data
         )
 
+    def replace(self, user_id: str, outfit_id: str, name: str, items: list[tuple[str, str]]) -> bool:
+        """Edit one of this user's outfits: new name, new (product_id, slot) items.
+
+        False if the user has no such outfit (nothing is changed). The edit is
+        three requests (rename, remove the old items, insert the new), so not
+        atomic: if the insert fails, the old name and items are put back
+        rather than leaving the set emptied, then the error surfaces.
+        """
+        found = (
+            self._client.table("outfits")
+            .select("id, name, outfit_items(product_id, slot)")
+            .eq("id", outfit_id)
+            .eq("user_id", user_id)
+            .execute()
+            .data
+        )
+        if not found:
+            return False
+        old_name = found[0]["name"]
+        old_items = [(i["product_id"], i["slot"]) for i in found[0].get("outfit_items") or []]
+
+        def rows(pairs):
+            return [{"outfit_id": outfit_id, "product_id": p, "slot": s} for p, s in pairs]
+
+        self._client.table("outfits").update({"name": name}).eq("id", outfit_id).eq(
+            "user_id", user_id
+        ).execute()
+        self._client.table("outfit_items").delete().eq("outfit_id", outfit_id).execute()
+        try:
+            self._client.table("outfit_items").insert(rows(items)).execute()
+        except Exception:
+            if old_items:
+                self._client.table("outfit_items").insert(rows(old_items)).execute()
+            self._client.table("outfits").update({"name": old_name}).eq("id", outfit_id).eq(
+                "user_id", user_id
+            ).execute()
+            raise
+        return True
+
     def delete(self, user_id: str, outfit_id: str) -> bool:
         """True if an outfit of this user's was deleted (its items go with it)."""
         result = (

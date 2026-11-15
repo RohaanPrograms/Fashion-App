@@ -8,7 +8,7 @@
 // With one item per row and the full-body rule, a set holds at most 4 items
 // (top, bottom, shoes, accessory), so the server's 5-item cap never bites.
 
-import type { Product } from "../api/client";
+import type { Outfit, Product } from "../api/client";
 
 export type Slot = "top" | "full_body" | "bottom" | "shoes" | "accessory";
 
@@ -98,4 +98,23 @@ export function problem(sel: Selection, name: string): string | null {
   if (trimmed.length > MAX_NAME_LENGTH) return `Keep the name to ${MAX_NAME_LENGTH} characters or fewer.`;
   if (chosen(sel).length < MIN_ITEMS) return "Pick at least 2 items, one per row.";
   return null;
+}
+
+// --- Editing a saved set ---------------------------------------------------------
+
+/** A saved set, as the builder's selection: each item in its row. A slot the
+ *  app doesn't know (say, a newer server) is skipped rather than crashing. */
+export function selectionFromOutfit(outfit: Outfit): Selection {
+  const sel: Selection = {};
+  for (const item of outfit.items) {
+    if ((SLOT_ORDER as string[]).includes(item.slot)) sel[item.slot as Slot] = item.product;
+  }
+  return sel;
+}
+
+/** The builder's choices when editing: the wardrobe, plus any of the set's
+ *  items that have since left it, so editing never silently drops a piece. */
+export function withSetItems(wardrobe: Product[], outfit: Outfit): Product[] {
+  const have = new Set(wardrobe.map((p) => p.id));
+  return [...wardrobe, ...outfit.items.map((i) => i.product).filter((p) => !have.has(p.id))];
 }

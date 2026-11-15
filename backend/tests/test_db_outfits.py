@@ -57,3 +57,70 @@ def test_deleting_is_filtered_by_user_and_id():
     query = client.queries[0]
     assert ("user_id", "user-a") in query.called("eq") and ("id", "o1") in query.called("eq")
     assert deleted is True
+
+
+# --- Editing ------------------------------------------------------------------
+
+def _saved(name="Old name", items=(("p1", "top"), ("p2", "bottom"))):
+    return {"outfits": [{"id": "o1", "name": name,
+                         "outfit_items": [{"product_id": p, "slot": s} for p, s in items]}]}
+
+
+def test_editing_checks_ownership_then_renames_and_swaps_the_items():
+    client = RecordingClient(_saved())
+
+    changed = SupabaseOutfitStore(client).replace("user-a", "o1", "New name", [("p3", "top"), ("p4", "shoes")])
+
+    assert changed is True
+    lookup, rename, remove, insert = client.queries
+    assert lookup.table == "outfits"
+    assert ("user_id", "user-a") in lookup.called("eq") and ("id", "o1") in lookup.called("eq")
+    assert rename.table == "outfits" and rename.called("update")[0][0] == {"name": "New name"}
+    assert ("user_id", "user-a") in rename.called("eq")
+    assert remove.table == "outfit_items" and remove.called("delete") == [()]
+    assert ("outfit_id", "o1") in remove.called("eq")
+    assert insert.called("insert")[0][0] == [
+        {"outfit_id": "o1", "product_id": "p3", "slot": "top"},
+        {"outfit_id": "o1", "product_id": "p4", "slot": "shoes"},
+    ]
+
+
+def test_editing_someone_elses_or_a_missing_outfit_changes_nothing():
+    client = RecordingClient({"outfits": []})
+
+    assert SupabaseOutfitStore(client).replace("user-a", "o1", "New", [("p3", "top")]) is False
+    assert len(client.queries) == 1  # only the lookup
+
+
+def test_a_failed_edit_puts_the_old_name_and_items_back():
+    """Three separate requests, so not atomic: never leave a set emptied."""
+    client = RecordingClient(_saved())
+    real_table = client.table
+    inserts = {"n": 0}
+
+    def table(name):
+        query = real_table(name)
+        if name == "outfit_items":
+            real_execute = query.execute
+
+            def execute():
+                if query.called("insert"):
+                    inserts["n"] += 1
+                    if inserts["n"] == 1:  # the new items fail; the restore succeeds
+                        raise RuntimeError("insert failed")
+                return real_execute()
+
+            query.execute = execute
+        return query
+
+    client.table = table
+
+    with pytest.raises(RuntimeError):
+        SupabaseOutfitStore(client).replace("user-a", "o1", "New name", [("p3", "top"), ("p4", "shoes")])
+
+    restore_items, restore_name = client.queries[-2], client.queries[-1]
+    assert restore_items.called("insert")[0][0] == [
+        {"outfit_id": "o1", "product_id": "p1", "slot": "top"},
+        {"outfit_id": "o1", "product_id": "p2", "slot": "bottom"},
+    ]
+    assert restore_name.called("update")[0][0] == {"name": "Old name"}

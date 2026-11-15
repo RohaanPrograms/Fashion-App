@@ -100,3 +100,39 @@ test("a name longer than the server accepts is caught before saving", () => {
   // Spaces around the name don't count, as on the server.
   expect(problem(sel, ` ${"x".repeat(MAX_NAME_LENGTH)} `)).toBeNull();
 });
+
+// --- Editing a saved set ---------------------------------------------------------
+
+import type { Outfit } from "../src/api/client";
+import { selectionFromOutfit, withSetItems } from "../src/outfits/builder";
+
+const saved: Outfit = {
+  id: "o1",
+  name: "Friday",
+  items: [
+    { slot: "top", product: tee },
+    { slot: "bottom", product: jeans },
+    { slot: "shoes", product: boots },
+  ],
+  total_price: 89.97,
+  currency: "GBP",
+};
+
+test("a saved set opens in the builder with its items picked", () => {
+  const sel = selectionFromOutfit(saved);
+  expect(selectedIds(sel)).toEqual(["tee", "jeans", "boots"]);
+  expect(totalPrice(sel)).toBe(89.97);
+});
+
+test("a slot the app doesn't know is ignored rather than breaking the builder", () => {
+  const odd = { ...saved, items: [...saved.items, { slot: "hat", product: bag }] };
+  expect(selectedIds(selectionFromOutfit(odd))).toEqual(["tee", "jeans", "boots"]);
+});
+
+test("a set's items stay in the rows even after leaving the wardrobe", () => {
+  const wardrobe = [shirt, jeans]; // tee and boots were removed from the wardrobe
+  const rows = groupBySlot(withSetItems(wardrobe, saved));
+  expect(rows.top.map((p) => p.id)).toEqual(["shirt", "tee"]);
+  expect(rows.bottom.map((p) => p.id)).toEqual(["jeans"]); // not twice
+  expect(rows.shoes.map((p) => p.id)).toEqual(["boots"]);
+});

@@ -230,6 +230,14 @@ export const api = {
   createOutfit: (token: string, name: string, productIds: string[]) =>
     request<Outfit>("/v1/outfits", { method: "POST", token, body: { name, product_ids: productIds } }),
 
+  // Edit a saved set: new name and items, the same rules as creating one.
+  updateOutfit: (token: string, outfitId: string, name: string, productIds: string[]) =>
+    request<Outfit>(`/v1/outfits/${encodeURIComponent(outfitId)}`, {
+      method: "PUT",
+      token,
+      body: { name, product_ids: productIds },
+    }),
+
   // Deletes the set only; its items stay in the wardrobe.
   deleteOutfit: (token: string, outfitId: string) =>
     request<unknown>(`/v1/outfits/${encodeURIComponent(outfitId)}`, { method: "DELETE", token }),

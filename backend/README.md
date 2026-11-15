@@ -146,6 +146,7 @@ python -m scripts.smoke_test --base-url https://<your-app>.up.railway.app
 | DELETE | `/v1/wardrobe/{product_id}` | Bearer token | Take one out (still counts toward taste; may return to the feed after 20 swipes) |
 | GET | `/v1/outfits` | Bearer token | My outfits with computed total prices |
 | POST | `/v1/outfits` | Bearer token | Save 2–5 garments, one per slot (a full-body item excludes a top or bottom) |
+| PUT | `/v1/outfits/{id}` | Bearer token | Edit one of my outfits: new name and items, same rules; someone else's is 404 |
 | DELETE | `/v1/outfits/{id}` | Bearer token | Delete one of my outfits |
 
 The feed's `exclude` lists cards the app already holds, so prefetching the next

@@ -45,7 +45,7 @@ Every gap is well clear of chance: the 95% bootstrap intervals don't overlap (re
 | 💡 | **Explains itself** | Tap ⓘ: what the piece is (type, colour, pattern, description) and *why* it's there — "because you liked the black hoodie", with the match score. |
 | 🔎 | **Filters** | Categories and garment types, several at once ("T-shirts + Sunglasses"); the feed takes turns between them, each still ranked by your taste. |
 | 👗 | **Wardrobe** | Everything you liked, in one grid. Remove items, or start over. |
-| 🧩 | **Sets** | Build outfits from your wardrobe, one item per row, with a live total price. |
+| 🧩 | **Sets** | Build outfits from your wardrobe, one item per row, with a live total price; edit them any time. |
 | ✉️ | **Save your wardrobe** | A guest can add an email (verified with a one-time code) and a password at any time, keeping every swipe. |
 
 ## How it works
@@ -130,7 +130,7 @@ Every push to `main` runs CI (the backend tests, the app's type check and Jest t
 | `GET` | `/v1/products/{id}` | Bearer | One garment |
 | `POST` / `DELETE` | `/v1/interactions` | Bearer | Record a like, dislike or skip / start over |
 | `GET` / `DELETE` | `/v1/wardrobe`, `/v1/wardrobe/{id}` | Bearer | Liked garments / take one out |
-| `GET` / `POST` / `DELETE` | `/v1/outfits`, `/v1/outfits/{id}` | Bearer | Saved sets with computed totals / save / delete |
+| `GET` / `POST` / `PUT` / `DELETE` | `/v1/outfits`, `/v1/outfits/{id}` | Bearer | Saved sets with computed totals / save / edit / delete |
 
 Every endpoint, with its rules, is in [`backend/README.md`](./backend/README.md); interactive docs are at `/docs` while the server runs.
 

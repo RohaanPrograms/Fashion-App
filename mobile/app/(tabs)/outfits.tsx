@@ -1,5 +1,6 @@
 // Your saved sets: name, total price, and the pieces head to toe. "+ New set"
-// opens the builder (app/outfits/new.tsx). Delete asks with a second tap.
+// opens the builder; Edit opens the same builder pre-filled
+// (src/outfits/BuilderScreen.tsx). Delete asks with a second tap.
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
@@ -84,12 +85,24 @@ export default function Outfits() {
                 <ProductTile key={piece.product.id} product={piece.product} width={90} />
               ))}
             </ScrollView>
-            <ConfirmButton
-              label="Delete"
-              confirmLabel="Delete this set?"
-              accessibilityLabel={`Delete the set ${item.name}`}
-              onConfirm={() => void remove(item)}
-            />
+            <View style={s.actions}>
+              <Pressable
+                onPress={() => router.push({ pathname: "/outfits/[id]/edit", params: { id: item.id } })}
+                accessibilityRole="button"
+                accessibilityLabel={`Edit the set ${item.name}`}
+                style={({ pressed }) => [s.edit, pressed && { opacity: 0.6 }]}
+              >
+                <Text style={s.editText}>Edit</Text>
+              </Pressable>
+              <View style={{ flex: 1 }}>
+                <ConfirmButton
+                  label="Delete"
+                  confirmLabel="Delete this set?"
+                  accessibilityLabel={`Delete the set ${item.name}`}
+                  onConfirm={() => void remove(item)}
+                />
+              </View>
+            </View>
           </View>
         )}
       />
@@ -104,4 +117,16 @@ const s = StyleSheet.create({
   card: { borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, gap: 10 },
   name: { fontSize: 17, fontWeight: "600", color: colors.text, flexShrink: 1 },
   total: { fontSize: 17, fontWeight: "700", color: colors.text },
+  actions: { flexDirection: "row", gap: 10 },
+  // Same size as the Delete button beside it, but dark: the everyday action.
+  edit: {
+    flex: 1,
+    borderRadius: 8,
+    paddingVertical: 7,
+    alignItems: "center",
+    backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  editText: { fontSize: 13, color: colors.primaryText, fontWeight: "600" },
 });

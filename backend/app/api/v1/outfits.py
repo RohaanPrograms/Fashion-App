@@ -2,6 +2,7 @@
 
 GET    /v1/outfits        — my outfits, newest first
 POST   /v1/outfits        — create one
+PUT    /v1/outfits/{id}   — edit one of mine (new name and items, same rules)
 DELETE /v1/outfits/{id}   — delete one of mine
 
 The rules live in app/recs/outfits.py. Total price is computed from current
@@ -58,6 +59,16 @@ def list_outfits(
     return OutfitListOut(outfits=outfits)
 
 
+def _plan(catalog: Catalog, body: OutfitIn) -> list[tuple[Product, str]]:
+    """Check the rules (the same for a new set and an edit); 404/422 if broken."""
+    try:
+        return plan_outfit(catalog, [str(p) for p in body.product_ids])
+    except UnknownProductError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"No such product: {exc.product_id}") from exc
+    except OutfitRuleError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+
 @router.post("", response_model=OutfitOut, status_code=status.HTTP_201_CREATED)
 def create_outfit(
     body: OutfitIn,
@@ -65,14 +76,25 @@ def create_outfit(
     catalog: Catalog = Depends(get_catalog),
     store=Depends(get_outfit_store),
 ) -> OutfitOut:
-    try:
-        planned = plan_outfit(catalog, [str(p) for p in body.product_ids])
-    except UnknownProductError as exc:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"No such product: {exc.product_id}") from exc
-    except OutfitRuleError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    planned = _plan(catalog, body)
     outfit_id = store.create(user.id, body.name, [(p.id, slot) for p, slot in planned])
     return _outfit_out(outfit_id, body.name, planned)
+
+
+@router.put("/{outfit_id}", response_model=OutfitOut)
+def edit_outfit(
+    outfit_id: UUID,
+    body: OutfitIn,
+    user: UserOut = Depends(get_current_user),
+    catalog: Catalog = Depends(get_catalog),
+    store=Depends(get_outfit_store),
+) -> OutfitOut:
+    """Replace one of my sets' name and items. The rules are checked first, so
+    a refused edit changes nothing; someone else's set is "not found"."""
+    planned = _plan(catalog, body)
+    if not store.replace(user.id, str(outfit_id), body.name, [(p.id, slot) for p, slot in planned]):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No such outfit")
+    return _outfit_out(str(outfit_id), body.name, planned)
 
 
 @router.delete("/{outfit_id}", status_code=status.HTTP_204_NO_CONTENT)
