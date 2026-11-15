@@ -26,8 +26,7 @@ def test_any_garment_can_go_in_an_outfit_not_only_wardrobe_items(api, ids):
 
 def test_too_few_or_too_many_items_is_422(api, ids):
     assert _create(api, ids, ["jeans"]).status_code == 422
-    six = ["black_tee", "jeans", "dress", "heels", "belt", "striped_tee"]
-    assert _create(api, ids, six).status_code == 422
+    assert _create(api, ids, ["belt"] * 21).status_code == 422
 
 
 def test_two_items_for_one_slot_is_422_with_a_plain_message(api, ids):
@@ -42,7 +41,7 @@ def test_a_dress_with_jeans_is_422_with_a_plain_message(api, ids):
 
     assert response.status_code == 422
     assert response.json()["detail"] == (
-        "A full-body item can't be combined with a top or bottom: dress and jeans."
+        "A full-body item can't be combined with a bottom: dress and jeans."
     )
     assert api.outfits.outfits == []
 
@@ -139,3 +138,39 @@ def test_editing_someone_elses_or_a_missing_set_is_404(api, ids):
     assert _edit(api, "00000000-0000-4000-9000-000000009999", ids, ["dress", "heels"]).status_code == 404
     api.sign_in_as(USER_A)
     assert api.client.get("/v1/outfits").json()["outfits"][0]["name"] == "Friday"
+
+
+
+# --- Layering (roles) ------------------------------------------------------------
+
+def test_a_top_under_a_dress_saves(api, ids):
+    response = _create(api, ids, ["black_tee", "dress", "heels"])
+
+    assert response.status_code == 201
+    assert [i["slot"] for i in response.json()["items"]] == ["top", "full_body", "shoes"]
+
+
+def test_roles_can_be_sent_and_a_wrong_one_is_422(api, ids):
+    ok = api.client.post(
+        "/v1/outfits",
+        json={"name": "Roles", "product_ids": [ids["black_tee"], ids["jeans"]], "slots": ["top", None]},
+    )
+    wrong = api.client.post(
+        "/v1/outfits",
+        json={"name": "Roles", "product_ids": [ids["black_tee"], ids["jeans"]], "slots": ["layer", None]},
+    )
+    mismatched = api.client.post(
+        "/v1/outfits",
+        json={"name": "Roles", "product_ids": [ids["black_tee"], ids["jeans"]], "slots": ["top"]},
+    )
+
+    assert ok.status_code == 201
+    assert wrong.status_code == 422 and "can't be worn as a layer" in wrong.json()["detail"]
+    assert mismatched.status_code == 422
+
+
+
+def test_the_same_accessory_twice_is_still_refused(api, ids, small_catalog):
+    """The small catalogue has one accessory (a belt), so two belts would be
+    the same garment twice: that's refused, as before."""
+    assert _create(api, ids, ["black_tee", "belt", "belt"]).status_code == 422

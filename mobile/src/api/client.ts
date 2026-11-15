@@ -228,15 +228,17 @@ export const api = {
 
   // The server re-checks every rule (src/outfits/builder.ts mirrors them) and
   // answers 422 with a plain-words reason if one is broken.
-  createOutfit: (token: string, name: string, productIds: string[]) =>
-    request<Outfit>("/v1/outfits", { method: "POST", token, body: { name, product_ids: productIds } }),
+  // `slots`: the row each item is in (same order), so a jumper or shirt keeps
+  // the role chosen for it (Top or Layer).
+  createOutfit: (token: string, name: string, productIds: string[], slots?: string[]) =>
+    request<Outfit>("/v1/outfits", { method: "POST", token, body: { name, product_ids: productIds, slots } }),
 
   // Edit a saved set: new name and items, the same rules as creating one.
-  updateOutfit: (token: string, outfitId: string, name: string, productIds: string[]) =>
+  updateOutfit: (token: string, outfitId: string, name: string, productIds: string[], slots?: string[]) =>
     request<Outfit>(`/v1/outfits/${encodeURIComponent(outfitId)}`, {
       method: "PUT",
       token,
-      body: { name, product_ids: productIds },
+      body: { name, product_ids: productIds, slots },
     }),
 
   // Deletes the set only; its items stay in the wardrobe.

@@ -1,4 +1,4 @@
-"""Outfits ("sets"): 2–5 garments, at most one per slot.
+"""Outfits ("sets"): 2–20 garments, one per slot except accessories (incl. a "layer").
 
 GET    /v1/outfits        — my outfits, newest first
 POST   /v1/outfits        — create one
@@ -62,7 +62,7 @@ def list_outfits(
 def _plan(catalog: Catalog, body: OutfitIn) -> list[tuple[Product, str]]:
     """Check the rules (the same for a new set and an edit); 404/422 if broken."""
     try:
-        return plan_outfit(catalog, [str(p) for p in body.product_ids])
+        return plan_outfit(catalog, [str(p) for p in body.product_ids], body.slots)
     except UnknownProductError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"No such product: {exc.product_id}") from exc
     except OutfitRuleError as exc:

@@ -31,7 +31,9 @@ export function ProductTile({ product, width, selected = false, onPress }: Props
   );
   if (!onPress) return body;
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected }}>
+    // aria-selected as well as accessibilityState: on the web, only the former
+    // reaches the page, so a screen reader can say which tiles are picked.
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected }} aria-selected={selected}>
       {body}
     </Pressable>
   );

@@ -1,7 +1,8 @@
 // The set builder, shared by two pages: /outfits/new (a fresh set) and
 // /outfits/{id}/edit (a saved set, pre-filled). One labelled row per slot
 // (Top, Full body, Bottom, Shoes, Accessory), filled from the wardrobe. Tap
-// to pick, tap again to unpick. The rules and the total are the tested
+// to pick, tap again to unpick. A jumper or shirt shows in both Top and
+// Layer: the row you tap it in is the role it plays. The rules and the total are the tested
 // functions in builder.ts; the server checks them all again when you save.
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -26,8 +27,11 @@ import {
   SLOT_LABELS,
   SLOT_ORDER,
   groupBySlot,
+  isPicked,
   problem,
+  rowHasPick,
   selectedIds,
+  selectedSlots,
   selectionFromOutfit,
   toggle,
   totalPrice,
@@ -98,8 +102,10 @@ export function BuilderScreen({ outfitId }: { outfitId?: string }) {
     setError(null);
     try {
       const token = await getValidToken();
-      if (outfitId !== undefined) await api.updateOutfit(token, outfitId, name.trim(), selectedIds(selection));
-      else await api.createOutfit(token, name.trim(), selectedIds(selection));
+      const ids = selectedIds(selection);
+      const slots = selectedSlots(selection);
+      if (outfitId !== undefined) await api.updateOutfit(token, outfitId, name.trim(), ids, slots);
+      else await api.createOutfit(token, name.trim(), ids, slots);
       done();
     } catch (err) {
       setError((err as ApiError).detail ?? "Couldn't save the set.");
@@ -122,7 +128,7 @@ export function BuilderScreen({ outfitId }: { outfitId?: string }) {
       <View key={slot} style={{ marginTop: 20 }}>
         <Text style={s.rowLabel}>
           {SLOT_LABELS[slot]}
-          {selection[slot] ? "  ✓" : ""}
+          {rowHasPick(selection, slot) ? "  ✓" : ""}
         </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
           {rows[slot].map((p) => (
@@ -130,8 +136,8 @@ export function BuilderScreen({ outfitId }: { outfitId?: string }) {
               key={p.id}
               product={p}
               width={TILE_WIDTH}
-              selected={selection[slot]?.id === p.id}
-              onPress={() => setSelection((current) => toggle(current, p))}
+              selected={isPicked(selection, slot, p)}
+              onPress={() => setSelection((current) => toggle(current, p, slot))}
             />
           ))}
         </ScrollView>

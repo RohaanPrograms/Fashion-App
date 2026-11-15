@@ -5,12 +5,20 @@
 // press Save. The server checks every rule again, so a mismatch here could
 // only make the screen less helpful, never let a bad set through.
 //
-// With one item per row and the full-body rule, a set holds at most 4 items
-// (top, bottom, shoes, accessory), so the server's 5-item cap never bites.
+// Rows, head to toe: Top · Full body · Layer · Bottom · Shoes · Accessory.
+// One item per row. Outer pieces (jackets, blazers, cardigans, hoodies) go in
+// Layer; jumpers and shirts can go in either Top or Layer, and you choose by
+// tapping them in that row. A full-body item (a dress) can't go with a
+// Bottom, but can have a Top under it and a Layer over it.
+//
+// Accessories are the exception to "one per row": they go by kind. One bag,
+// one hat, one pair of sunglasses, one belt, one scarf; as much jewellery and
+// as many hair accessories as you like. (The server caps a set at 20 items as
+// a safety net, not a design limit.)
 
 import type { Outfit, Product } from "../api/client";
 
-export type Slot = "top" | "full_body" | "bottom" | "shoes" | "accessory";
+export type Slot = "top" | "full_body" | "layer" | "bottom" | "shoes" | "accessory";
 
 export const SLOT_BY_CATEGORY: Record<string, Slot> = {
   "Garment Upper body": "top",
@@ -20,65 +28,140 @@ export const SLOT_BY_CATEGORY: Record<string, Slot> = {
   Accessories: "accessory",
 };
 
-// Head to toe: the order rows appear in, and ids are sent in.
-export const SLOT_ORDER: Slot[] = ["top", "full_body", "bottom", "shoes", "accessory"];
+// Upper-body garment types that aren't plain tops; the first is the default.
+const UPPER_BODY_SLOTS_BY_TYPE: Record<string, Slot[]> = {
+  Jacket: ["layer"],
+  Blazer: ["layer"],
+  Cardigan: ["layer"],
+  Hoodie: ["layer"],
+  Sweater: ["layer", "top"], // a jumper: usually over something
+  Shirt: ["top", "layer"], // usually on its own; open over a tank
+};
+
+// Head to toe: the order rows appear in, and items are sent in.
+export const SLOT_ORDER: Slot[] = ["top", "full_body", "layer", "bottom", "shoes", "accessory"];
 
 export const SLOT_LABELS: Record<Slot, string> = {
   top: "Top",
   full_body: "Full body",
+  layer: "Layer",
   bottom: "Bottom",
   shoes: "Shoes",
   accessory: "Accessory",
 };
 
+// Accessory kinds (H&M garment type -> kind) and whether a set can hold
+// several of that kind. A type not listed counts as "other": one.
+const ACCESSORY_KIND_BY_TYPE: Record<string, string> = {
+  Bag: "bag",
+  "Hat/brim": "hat", "Hat/beanie": "hat", "Bucket hat": "hat", "Straw hat": "hat",
+  "Felt hat": "hat", "Cap/peaked": "hat", Cap: "hat",
+  Earring: "jewellery", Earrings: "jewellery", Necklace: "jewellery", Ring: "jewellery", Bracelet: "jewellery",
+  Sunglasses: "sunglasses",
+  Belt: "belt", Braces: "belt",
+  Scarf: "scarf", "Other accessories": "scarf",
+  "Hair/alice band": "hair", "Hair string": "hair", "Hair ties": "hair", "Hair clip": "hair", Hairband: "hair",
+};
+const STACKING_KINDS = new Set(["jewellery", "hair"]);
+
+function accessoryKind(p: Product): string {
+  return ACCESSORY_KIND_BY_TYPE[p.type ?? ""] ?? "other";
+}
+
 export const MIN_ITEMS = 2;
 export const MAX_NAME_LENGTH = 60;
 
-// A full-body item already covers these two slots.
-const COVERED_BY_FULL_BODY: Slot[] = ["top", "bottom"];
+type SingleSlot = Exclude<Slot, "accessory">;
 
-export type Selection = Partial<Record<Slot, Product>>;
+/** What's picked: one item per row, except accessories, which are a list. */
+export type Selection = Partial<Record<SingleSlot, Product>> & { accessory?: Product[] };
 
+/** Is this tile picked in this row? */
+export function isPicked(sel: Selection, slot: Slot, p: Product): boolean {
+  if (slot === "accessory") return (sel.accessory ?? []).some((a) => a.id === p.id);
+  return sel[slot]?.id === p.id;
+}
+
+/** Does this row have anything picked (for its ✓)? */
+export function rowHasPick(sel: Selection, slot: Slot): boolean {
+  if (slot === "accessory") return (sel.accessory ?? []).length > 0;
+  return sel[slot] !== undefined;
+}
+
+/** Every row this garment can go in, the default first; [] if none. */
+export function slotsOf(p: Product): Slot[] {
+  const slot = SLOT_BY_CATEGORY[p.category ?? ""];
+  if (!slot) return [];
+  if (slot === "top") return UPPER_BODY_SLOTS_BY_TYPE[p.type ?? ""] ?? ["top"];
+  return [slot];
+}
+
+/** The row a garment goes in when it isn't tapped in a particular row. */
 export function slotOf(p: Product): Slot | null {
-  return SLOT_BY_CATEGORY[p.category ?? ""] ?? null;
+  return slotsOf(p)[0] ?? null;
 }
 
 export function groupBySlot(products: Product[]): Record<Slot, Product[]> {
-  const rows: Record<Slot, Product[]> = { top: [], full_body: [], bottom: [], shoes: [], accessory: [] };
+  const rows: Record<Slot, Product[]> = { top: [], full_body: [], layer: [], bottom: [], shoes: [], accessory: [] };
   for (const p of products) {
-    const slot = slotOf(p);
-    if (slot) rows[slot].push(p);
+    // A jumper or shirt is offered in both of its rows.
+    for (const slot of slotsOf(p)) rows[slot].push(p);
   }
   return rows;
 }
 
-/** Tap an item: select it (replacing whatever was in its row), or deselect it. */
-export function toggle(sel: Selection, p: Product): Selection {
-  const slot = slotOf(p);
-  if (!slot) return sel;
+/** Tap an item in a row: select it there (replacing whatever was in that row,
+ *  and moving it out of any other row), or deselect it if it was there. */
+export function toggle(sel: Selection, p: Product, slot: Slot | null = slotOf(p)): Selection {
+  if (!slot || !slotsOf(p).includes(slot)) return sel;
   const next: Selection = { ...sel };
+  if (slot === "accessory") {
+    const worn = sel.accessory ?? [];
+    if (worn.some((a) => a.id === p.id)) {
+      next.accessory = worn.filter((a) => a.id !== p.id);
+      return next;
+    }
+    const kind = accessoryKind(p);
+    // One bag, one hat...: a second of a one-only kind replaces the first.
+    const kept = STACKING_KINDS.has(kind) ? worn : worn.filter((a) => accessoryKind(a) !== kind);
+    next.accessory = [...kept, p];
+    return next;
+  }
   if (sel[slot]?.id === p.id) {
     delete next[slot];
     return next;
   }
+  for (const other of SINGLE_SLOTS) if (next[other]?.id === p.id) delete next[other];
   next[slot] = p;
-  if (slot === "full_body") {
-    for (const covered of COVERED_BY_FULL_BODY) delete next[covered];
-  } else if (COVERED_BY_FULL_BODY.includes(slot)) {
-    delete next.full_body;
-  }
+  // A dress covers the legs: it and a bottom replace each other.
+  if (slot === "full_body") delete next.bottom;
+  if (slot === "bottom") delete next.full_body;
   return next;
 }
 
-function chosen(sel: Selection): Product[] {
-  return SLOT_ORDER.flatMap((slot) => {
+const SINGLE_SLOTS = SLOT_ORDER.filter((s): s is SingleSlot => s !== "accessory");
+
+/** Every picked item with its row, head to toe (accessories last, in the order picked). */
+function chosenWithSlots(sel: Selection): [Product, Slot][] {
+  const singles = SINGLE_SLOTS.flatMap((slot): [Product, Slot][] => {
     const p = sel[slot]; // a local, so TypeScript knows it isn't undefined below
-    return p ? [p] : [];
+    return p ? [[p, slot]] : [];
   });
+  return [...singles, ...(sel.accessory ?? []).map((p): [Product, Slot] => [p, "accessory"])];
+}
+
+function chosen(sel: Selection): Product[] {
+  return chosenWithSlots(sel).map(([p]) => p);
 }
 
 export function selectedIds(sel: Selection): string[] {
   return chosen(sel).map((p) => p.id);
+}
+
+/** The row each picked item is in, in the same order as selectedIds: sent to
+ *  the server so a jumper saved as a Layer stays a Layer. */
+export function selectedSlots(sel: Selection): Slot[] {
+  return chosenWithSlots(sel).map(([, slot]) => slot);
 }
 
 /** Sum of the known prices, or null if none is known: the server's rule. */
@@ -107,7 +190,12 @@ export function problem(sel: Selection, name: string): string | null {
 export function selectionFromOutfit(outfit: Outfit): Selection {
   const sel: Selection = {};
   for (const item of outfit.items) {
-    if ((SLOT_ORDER as string[]).includes(item.slot)) sel[item.slot as Slot] = item.product;
+    const allowed = slotsOf(item.product);
+    // A set saved before layering existed may file a jacket as a "top": put
+    // it in a row it's allowed in, so saving it again isn't refused.
+    const slot = allowed.includes(item.slot as Slot) ? (item.slot as Slot) : allowed[0];
+    if (slot === "accessory") sel.accessory = [...(sel.accessory ?? []), item.product];
+    else if (slot && sel[slot] === undefined) sel[slot] = item.product;
   }
   return sel;
 }

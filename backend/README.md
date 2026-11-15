@@ -145,7 +145,7 @@ python -m scripts.smoke_test --base-url https://<your-app>.up.railway.app
 | GET | `/v1/wardrobe` | Bearer token | Liked garments, most recent first |
 | DELETE | `/v1/wardrobe/{product_id}` | Bearer token | Take one out (still counts toward taste; may return to the feed after 20 swipes) |
 | GET | `/v1/outfits` | Bearer token | My outfits with computed total prices |
-| POST | `/v1/outfits` | Bearer token | Save 2–5 garments, one per slot (a full-body item excludes a top or bottom) |
+| POST | `/v1/outfits` | Bearer token | Save a set: one top, layer, full body or bottom, shoes; accessories by kind (one bag, hat, sunglasses, belt, scarf; any amount of jewellery and hair accessories); 2–20 items. A full-body item excludes a bottom; optional `slots` picks the role of a jumper or shirt (top or layer) |
 | PUT | `/v1/outfits/{id}` | Bearer token | Edit one of my outfits: new name and items, same rules; someone else's is 404 |
 | DELETE | `/v1/outfits/{id}` | Bearer token | Delete one of my outfits |
 

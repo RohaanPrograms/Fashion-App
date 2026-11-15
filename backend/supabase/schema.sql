@@ -296,8 +296,9 @@ create index if not exists cart_user_idx on public.cart_items (user_id);
 -- =====================================================================
 --  outfits / outfit_items — saved sets of 2–5 garments
 -- =====================================================================
--- The API enforces "2 to 5 items"; the primary key below enforces "one item
--- per slot" in the database too. No total price column: it is computed on
+-- The API enforces the rules (one per slot except accessories, which go by
+-- kind: one bag or hat, any amount of jewellery; 2–20 items). The primary key
+-- below stops the same garment appearing twice in one set. No total price column: it is computed on
 -- read, because a stored total goes stale the moment a price changes.
 create table if not exists public.outfits (
   id uuid primary key default gen_random_uuid(),
@@ -309,9 +310,45 @@ create table if not exists public.outfits (
 create table if not exists public.outfit_items (
   outfit_id uuid not null references public.outfits (id) on delete cascade,
   product_id uuid not null references public.products (id) on delete cascade,
-  slot text not null check (slot in ('top', 'bottom', 'full_body', 'shoes', 'accessory')),
-  primary key (outfit_id, slot)
+  slot text not null,
+  primary key (outfit_id, product_id)
 );
+
+-- Several accessories (2026-11-15): the key used to be (outfit_id, slot),
+-- one item per slot. Re-runnable: swap it only while it still names `slot`.
+do $$
+begin
+  if exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.outfit_items'::regclass and contype = 'p'
+      and pg_get_constraintdef(oid) like '%slot%'
+  ) then
+    alter table public.outfit_items drop constraint outfit_items_pkey;
+    alter table public.outfit_items add primary key (outfit_id, product_id);
+  end if;
+end $$;
+
+-- Layering (2026-11-15): outer pieces got their own "layer" slot. Re-runnable:
+-- drop whichever check constraint limits `slot` (the original was unnamed,
+-- so Postgres chose its name), add the current one, and move jackets,
+-- blazers, cardigans and hoodies saved as a "top" before layering existed.
+do $$
+declare c text;
+begin
+  for c in
+    select conname from pg_constraint
+    where conrelid = 'public.outfit_items'::regclass and contype = 'c'
+      and pg_get_constraintdef(oid) like '%slot%'
+  loop
+    execute format('alter table public.outfit_items drop constraint %I', c);
+  end loop;
+end $$;
+alter table public.outfit_items add constraint outfit_items_slot_check
+  check (slot in ('top', 'layer', 'bottom', 'full_body', 'shoes', 'accessory'));
+update public.outfit_items oi set slot = 'layer'
+  from public.products p
+  where oi.product_id = p.id and oi.slot = 'top'
+    and p.attributes->>'type' in ('Jacket', 'Blazer', 'Cardigan', 'Hoodie');
 
 create index if not exists outfits_user_created_idx
   on public.outfits (user_id, created_at desc);

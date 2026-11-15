@@ -12,6 +12,9 @@ class OutfitIn(BaseModel):
 
     name: str = Field(min_length=1, max_length=60)
     product_ids: list[UUID] = Field(min_length=MIN_ITEMS, max_length=MAX_ITEMS)
+    # Optional, one per garment: the role it plays ("top" or "layer" for a
+    # jumper or shirt), or null for its default. Checked in app/recs/outfits.py.
+    slots: list[str | None] | None = Field(default=None, max_length=MAX_ITEMS)
 
 
 class OutfitItemOut(BaseModel):
