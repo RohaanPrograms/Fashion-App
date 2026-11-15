@@ -287,3 +287,51 @@ test("a saved set with several accessories opens with all of them picked", () =>
   };
   expect(selectedIds(selectionFromOutfit(saved))).toEqual(["tee", "necklace", "ring", "tote"]);
 });
+
+// --- Picked first, and the review page ----------------------------------------------
+
+import { orderRow, reviewGroups } from "../src/outfits/builder";
+
+const ids2 = (ps: Product[]) => ps.map((p) => p.id);
+
+test("a picked item moves to the front of its row; the rest keep their order", () => {
+  const row = [tee, shirt, tank];
+  expect(ids2(orderRow(row, toggle({}, tank), "top"))).toEqual(["tank", "tee", "shirt"]);
+});
+
+test("unpicking puts it back where it was", () => {
+  const row = [tee, shirt, tank];
+  const sel = toggle(toggle({}, tank), tank);
+  expect(ids2(orderRow(row, sel, "top"))).toEqual(["tee", "shirt", "tank"]);
+});
+
+test("several accessories line up at the front in the order picked", () => {
+  const row = [tote, necklace, cap, ring, earrings];
+  const sel = toggle(toggle(toggle({}, ring), tote), necklace);
+  expect(ids2(orderRow(row, sel, "accessory"))).toEqual(["ring", "tote", "necklace", "cap", "earrings"]);
+});
+
+test("picking in one row doesn't reorder another", () => {
+  const row = [tee, shirt, tank];
+  expect(ids2(orderRow(row, toggle({}, jeans), "top"))).toEqual(["tee", "shirt", "tank"]);
+});
+
+test("a jumper picked as a Layer is first in Layer but stays in place in Top", () => {
+  const sel = toggle({}, jumper, "layer");
+  expect(ids2(orderRow([jacket, jumper], sel, "layer"))).toEqual(["jumper", "jacket"]);
+  expect(ids2(orderRow([tee, jumper], sel, "top"))).toEqual(["tee", "jumper"]);
+});
+
+test("the review groups the picks head to toe, leaving out empty rows", () => {
+  const sel = [necklace, jeans, tee, ring, jacket].reduce((s: Selection, p) => toggle(s, p), {});
+  expect(reviewGroups(sel).map((g) => [g.label, ids2(g.items)])).toEqual([
+    ["Top", ["tee"]],
+    ["Layer", ["jacket"]],
+    ["Bottom", ["jeans"]],
+    ["Accessories", ["necklace", "ring"]],
+  ]);
+});
+
+test("one accessory is labelled in the singular", () => {
+  expect(reviewGroups(toggle({}, tote)).map((g) => g.label)).toEqual(["Accessory"]);
+});

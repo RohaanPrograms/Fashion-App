@@ -1,9 +1,11 @@
 // The set builder, shared by two pages: /outfits/new (a fresh set) and
 // /outfits/{id}/edit (a saved set, pre-filled). One labelled row per slot
 // (Top, Full body, Bottom, Shoes, Accessory), filled from the wardrobe. Tap
-// to pick, tap again to unpick. A jumper or shirt shows in both Top and
-// Layer: the row you tap it in is the role it plays. The rules and the total are the tested
+// to pick, tap again to unpick; picks move to the front of their row. A
+// jumper or shirt shows in both Top and Layer: the row you tap it in is the
+// role it plays. "Review set" shows every pick, head to toe, before saving. The rules and the total are the tested
 // functions in builder.ts; the server checks them all again when you save.
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -28,7 +30,9 @@ import {
   SLOT_ORDER,
   groupBySlot,
   isPicked,
+  orderRow,
   problem,
+  reviewGroups,
   rowHasPick,
   selectedIds,
   selectedSlots,
@@ -56,6 +60,9 @@ export function BuilderScreen({ outfitId }: { outfitId?: string }) {
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Second mode of the same screen: the review page. Not a separate address,
+  // so "Back to edit" (or a reload) can't lose the picks halfway.
+  const [reviewing, setReviewing] = useState(false);
 
   // After a reload on this page the saved session is still being checked
   // (`loading`), and there's no token yet. The tabs wait behind a spinner;
@@ -131,7 +138,7 @@ export function BuilderScreen({ outfitId }: { outfitId?: string }) {
           {rowHasPick(selection, slot) ? "  ✓" : ""}
         </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-          {rows[slot].map((p) => (
+          {orderRow(rows[slot], selection, slot).map((p) => (
             <ProductTile
               key={p.id}
               product={p}
@@ -146,6 +153,63 @@ export function BuilderScreen({ outfitId }: { outfitId?: string }) {
   }
 
   const saveLabel = saving ? "Saving…" : editing ? "Save changes" : "Save set";
+  const totalText = `Total ${total === null ? "—" : formatPrice(total, currency)}`;
+
+  if (reviewing) {
+    return (
+      <View style={s.screen}>
+        <View style={[s.column, { width: columnWidth }]}>
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 18 }}>
+            <View>
+              <Text style={styles.label}>Review your set</Text>
+              <Text style={styles.title}>{name.trim()}</Text>
+            </View>
+            {reviewGroups(selection).map((group) => (
+              <View key={group.slot} style={{ gap: 10 }}>
+                <Text style={s.rowLabel}>{group.label}</Text>
+                {group.items.map((p) => (
+                  <View key={p.id} style={s.reviewItem}>
+                    <View style={s.reviewPhoto}>
+                      {p.image_url ? (
+                        <Image source={p.image_url} style={{ width: "100%", height: "100%" }} contentFit="cover" />
+                      ) : null}
+                    </View>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={s.reviewName}>{p.name}</Text>
+                      {p.type && <Text style={s.reviewMeta}>{p.type}</Text>}
+                      <Text style={s.reviewMeta}>{formatPrice(p.price, p.currency)}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ))}
+          </ScrollView>
+          <View style={s.footer}>
+            <Text style={s.total}>{totalText}</Text>
+            {error && <Text style={styles.error}>{error}</Text>}
+            <View style={s.reviewButtons}>
+              <Pressable
+                style={({ pressed }) => [s.back, pressed && { opacity: 0.6 }]}
+                onPress={() => setReviewing(false)}
+                disabled={saving}
+                accessibilityRole="button"
+              >
+                <Text style={s.backText}>Back to edit</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.button, { flex: 1, marginTop: 0 }, saving && styles.buttonDisabled]}
+                disabled={saving}
+                onPress={save}
+                accessibilityRole="button"
+              >
+                <Text style={styles.buttonText}>{saveLabel}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={s.screen}>
@@ -165,16 +229,19 @@ export function BuilderScreen({ outfitId }: { outfitId?: string }) {
         </ScrollView>
         {/* Stays put while the rows scroll. */}
         <View style={s.footer}>
-          <Text style={s.total}>Total {total === null ? "—" : formatPrice(total, currency)}</Text>
+          <Text style={s.total}>{totalText}</Text>
           {issue && <Text style={styles.info}>{issue}</Text>}
           {error && <Text style={styles.error}>{error}</Text>}
           <Pressable
-            style={[styles.button, { marginTop: 12 }, (issue !== null || saving) && styles.buttonDisabled]}
-            disabled={issue !== null || saving}
-            onPress={save}
+            style={[styles.button, { marginTop: 12 }, issue !== null && styles.buttonDisabled]}
+            disabled={issue !== null}
+            onPress={() => {
+              setError(null);
+              setReviewing(true);
+            }}
             accessibilityRole="button"
           >
-            <Text style={styles.buttonText}>{saveLabel}</Text>
+            <Text style={styles.buttonText}>Review set</Text>
           </Pressable>
         </View>
       </View>
@@ -187,5 +254,20 @@ const s = StyleSheet.create({
   column: { flex: 1 },
   rowLabel: { fontSize: 15, fontWeight: "600", color: colors.text, marginBottom: 8 },
   footer: { borderTopWidth: 1, borderColor: colors.border, padding: 16 },
+  reviewItem: { flexDirection: "row", gap: 12, alignItems: "center" },
+  reviewPhoto: { width: 72, height: 108, borderRadius: 8, overflow: "hidden", backgroundColor: colors.fieldBg },
+  reviewName: { fontSize: 15, fontWeight: "600", color: colors.text },
+  reviewMeta: { fontSize: 13, color: colors.muted },
+  reviewButtons: { flexDirection: "row", gap: 10, marginTop: 12 },
+  back: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+  },
+  backText: { fontSize: 16, fontWeight: "600", color: colors.text },
   total: { fontSize: 18, fontWeight: "700", color: colors.text },
 });

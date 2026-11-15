@@ -206,3 +206,31 @@ export function withSetItems(wardrobe: Product[], outfit: Outfit): Product[] {
   const have = new Set(wardrobe.map((p) => p.id));
   return [...wardrobe, ...outfit.items.map((i) => i.product).filter((p) => !have.has(p.id))];
 }
+
+// --- Picked first, and the review page ---------------------------------------------
+
+/** A row as the builder draws it: what's picked first (in the order picked),
+ *  then everything else in its original order. Unpick an item and it goes
+ *  back to its place. So a row's picks are always visible at its start. */
+export function orderRow(products: Product[], sel: Selection, slot: Slot): Product[] {
+  const picked = products.filter((p) => isPicked(sel, slot, p));
+  if (slot === "accessory") {
+    const order = (sel.accessory ?? []).map((a) => a.id);
+    picked.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+  }
+  return [...picked, ...products.filter((p) => !isPicked(sel, slot, p))];
+}
+
+export type ReviewGroup = { slot: Slot; label: string; items: Product[] };
+
+/** The review page: every pick, head to toe, grouped by row; empty rows left out. */
+export function reviewGroups(sel: Selection): ReviewGroup[] {
+  const groups: ReviewGroup[] = [];
+  for (const slot of SLOT_ORDER) {
+    const items = slot === "accessory" ? sel.accessory ?? [] : sel[slot] ? [sel[slot]!] : [];
+    if (items.length === 0) continue;
+    const label = slot === "accessory" && items.length > 1 ? "Accessories" : SLOT_LABELS[slot];
+    groups.push({ slot, label, items });
+  }
+  return groups;
+}
